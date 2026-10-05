@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.erobrine.tlmcw.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "EntityMaidMixin",
+    "SchedulePosMixin",
+    "MaidUpdateActivityFromScheduleMixin",
+    "MaidNodeEvaluatorMixin",
+    "MaidBrainMixin",
+    "MaidBedTaskMixin",
+    "MaidJoyTaskMixin",
+    "MaidFindHomeMealTaskMixin",
+    "MaidMoveToBlockTaskMixin",
+    "MaidPickupEntitiesSensorMixin",
+    "MaidNearestLivingEntitySensorMixin",
+    "PickupArrivalMapMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

@@ -1,10 +1,6 @@
-Scope: This MIT license applies to the project's original code. Adapted
-Touhou Little Maid artwork is excluded and licensed under CC BY-NC-SA 4.0.
-See NOTICE.md and LICENSE-CC for asset attribution and license terms.
-
 MIT License
 
-Copyright (c) 2026 Barry Han
+Copyright (c) 2019-2025 tartaric_acid, for the code part
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

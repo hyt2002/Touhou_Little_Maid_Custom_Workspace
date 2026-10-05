@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "touhou_little_maid:kappa_compass" },
+    { "item": "minecraft:redstone" },
+    { "item": "minecraft:copper_ingot" }
+  ],
+  "result": {
+    "id": "touhou_little_maid_custom_workspace:kappa_smart_compass",
+    "count": 1
+  }
+}
