@@ -4,102 +4,91 @@
 
 [简体中文](README.md)
 
-Adds **Kappa's Smart Compass** to [Touhou Little Maid](https://github.com/TartaricAcid/TouhouLittleMaid). Give each maid her own cuboid work, rest and sleep areas, guide travel with a bidirectional waypoint graph, and rotate work destinations using game-tick schedules.
+Adds **Kappa's Smart Compass** to **Touhou Little Maid**, giving each maid her own cuboid work, rest and sleep areas. You can use waypoints to guide her around obstacles, or use a schedule to send her to different work areas in sequence, rotating after a specified number of working game ticks.
 
 ## Development Stage
 
-This is the project's first public version, **1.3.3**. It has passed the build, 49 unit tests, 28 game integration tests, and client input, UI and texture verification. Reports from complex terrain and third-party tasks are welcome.
-
-Please include mod versions, reproduction steps, area/waypoint screenshots and relevant logs in [Issues](https://github.com/hyt2002/Touhou_Little_Maid_Custom_Workspace/issues). Mention whether Home is enabled, whether the maid entered the area, and whether the waypoint segments are traversable.
+If you encounter a stuck maid, unexpected area switching or UI problems, please include mod versions, reproduction steps, area/waypoint screenshots and relevant logs in [Issues](https://github.com/hyt2002/Touhou_Little_Maid_Custom_Workspace/issues). Whenever possible, provide materials that help reproduce the issue, such as a world save.
 
 ## Installation
 
-- Minecraft **1.21.1**, **NeoForge**; developed and tested with NeoForge **21.1.219**.
-- Requires **Touhou Little Maid 1.5.3 for NeoForge / Minecraft 1.21.1**.
-- Install the addon JAR in `mods` on **both client and server**, using matching addon versions.
-- Create and Catnip are not required.
+| Component | Currently supported / tested version |
+| --- | --- |
+| Minecraft | 1.21.1 |
+| Mod loader | NeoForge, developed and tested with version 21.1.219 |
+| Required mod | [Touhou Little Maid](https://github.com/TartaricAcid/TouhouLittleMaid) 1.5.3 for NeoForge / Minecraft 1.21.1 |
+| Client-only? | Install on both client and server |
 
 ## Usage
 
-### Smart Compass and Tools
+### Kappa's Smart Compass
 
-Find the Smart Compass in the TLM creative tab, or craft it shapelessly using one **Kappa Compass**, one **Redstone Dust** and one **Copper Ingot**.
+**Kappa's Smart Compass** can be crafted shapelessly using one **Kappa Compass**, one **Redstone Dust** and one **Copper Ingot**.
 
 Hold it in your main hand. Hold the tool-menu key (default **Left Alt**), scroll to select a tool, then release to confirm:
 
 | Tool | Action |
 | --- | --- |
-| Cuboid selection | Use two block corners to add an area, initially marked as work |
+| Cuboid selection | Select two block corners to add a cuboid area, initially marked as work |
 | Route nodes | Choose a starting node, then create or connect mandatory waypoints |
-| Mark areas | Use a cuboid to cycle work → rest → sleep |
-| Rename areas | Use a cuboid to open its name editor |
-| Schedule options | Use to edit work destinations and delay conditions |
-| Apply to maid | Use your own maid to copy the plan; enable **Home** |
+| Mark areas | Click an existing cuboid to cycle work → rest → sleep |
+| Rename areas | Click a cuboid to open its name editor; its name and type appear above the box |
+| Schedule options | Click to open the work schedule and edit destinations and delay conditions |
+| Apply to maid | Click your own maid to apply the settings |
 
-“Use”, “Attack” and “Sneak” follow Minecraft's configured bindings, including swapped mouse buttons. In-game help displays the actual keys. The menu and clear keys are also rebindable.
+### Cuboid Areas
 
-### Areas and Waypoints
+Work areas are **red**, rest areas **green**, and sleep areas **blue**, matching the original Kappa Compass. Bounds include both endpoint block coordinates and must contain the maid's actual feet block; selecting only a solid floor does not count as arrival. Sleep areas should also include the bed's head block.
 
-Create cuboids, mark their types, optionally name them, then apply the plan to a maid. Work is **red**, rest **green**, and sleep **blue**. Bounds include both endpoint block coordinates and must contain the maid's actual feet block; selecting only a solid floor does not count as arrival. Sleep areas should also include the bed's head block.
+### Route Nodes
 
-In the route tool, use an existing area or waypoint to choose a start. Walk to the desired waypoint and use a position that is not an existing node, either a block or air. The node records **your current feet block**, not the clicked block, and connects to the previous node. Continue adding points, or use another existing node to connect it. Edges are bidirectional; there is no “finish editing” step.
+Waypoints can help a maid navigate around long walls, through entrances or across other terrain that requires several navigation stages.
 
-Maids follow the shortest graph route through each mandatory node, advancing only after actually entering its box. With no valid graph route, they navigate directly to the destination. Outside all nodes, they enter the nearest intermediate waypoint in the destination's connected component. Multiple rest or sleep areas are chosen by total graph distance. Distance uses game coordinates, not precomputed terrain path lengths; ensure each segment is traversable. See [route details](docs/ROUTE-GRAPH.md).
+1. Select “Route nodes” and use an existing area or waypoint as the starting node.
+2. Walk to the position you want the maid to pass through. Click a position that is not an existing node, such as a block or air. The compass records **your current feet block**, creates a single-block node and connects it to the starting node.
+3. The new node becomes the starting point for the next connection. Continue adding nodes, or use another existing node to connect the two.
+4. Connect the route to the destination area, then apply it to the maid.
+
+Attack an intermediate waypoint to remove it and its incident edges. Attacking an area in the route tool removes only its connections, preserving the area itself.
+
+Maids prioritize the shortest graph route and navigate through each node, advancing only after actually entering its box. If no valid graph route exists, they navigate directly to the destination area. Outside all nodes, a maid first enters the nearest intermediate waypoint in the destination's connected component. Multiple rest or sleep areas are selected by total graph distance.
+
+The shortest distance is calculated from game coordinates, without simulating the actual detour around obstacles. See [route details](docs/ROUTE-GRAPH.md).
 
 ### Work Schedules
 
-The editor uses destination cards and separate condition editors, inspired by Create train schedules. The current condition is **delay x game ticks**, counted while working after arrival. Travel, rest, sleep and inability to work pause progress; wall-clock time is not used.
+“Schedule options” uses destination cards and separate condition editors, inspired by Create's train schedules. The current condition is **delay x game ticks**: after arriving at the specified work area, the maid starts counting working ticks, then proceeds to the next destination when the condition is met.
 
-Choose destinations and delays, reorder, duplicate or remove entries, and run cyclically or once. A finished one-shot schedule stays in the last work area and continues the original task. Without a custom schedule, work areas rotate in added order after **2400 working game ticks** each. Confirm the editor to save the compass draft, then reapply it to the maid.
+You can choose work areas, adjust delays, reorder, duplicate or remove entries, and run cyclically or once. With looping disabled, the maid finishes the last entry, stays in that work area and continues her original task. Without a custom schedule, work areas rotate in added order after **2400 working game ticks** each.
 
-### Removing Data
+Travel, rest, sleep and inability to work pause progress. After confirming the editor to save the compass draft, reapply it to the maid.
 
-- Attack a cuboid in the cuboid tool to remove it. Sneak + Use cancels an unfinished selection.
-- Attack a waypoint in the route tool to delete it and its edges; attacking an area there only removes its connections.
-- Sneak + Clear (default **Shift+V**) removes all cuboid types in the cuboid tool, or only intermediate waypoints in the route tool. The other node category is preserved; incident edges are removed.
-- Sneak + Use your maid in the apply tool to clear her custom configuration and restore original area behavior.
+### Deleting and Clearing
+
+- Attack an existing cuboid in the cuboid tool to remove the area and related references. Sneak + Use cancels an unfinished selection.
+- Sneak + Clear (default **Shift+V**) removes all work, rest and sleep cuboids in the cuboid tool, preserving intermediate waypoints. In the route tool it removes only intermediate points, preserving areas. Incident edges of removed nodes are also deleted.
+- Sneak + Use your own maid in the apply tool to clear her custom areas and routes, restoring original area behavior.
 
 ## Compatibility
 
-- **Both compasses coexist:** for each schedule type, custom cuboids take priority when present; otherwise TLM's original compass positions and behavior apply.
-- **Applied data belongs to the maid:** editing, clearing or destroying the compass does not affect her. Reapplying replaces her custom plan. Each maid has an independent snapshot.
-- Navigation still uses TLM's pathfinding. Waypoints guide difficult detours; arrival uses strict cuboid bounds.
-- The addon changes area membership and candidate searches. Individual tasks retain their own operations and area effects.
+- **The original compass and Smart Compass can coexist.** For each schedule type, custom cuboids take priority when present; otherwise TLM's original compass positions and behavior apply. The original compass retains its existing functions.
+- Maids still use TLM's original pathfinding.
+- The addon changes areas and candidate target searches. Individual tasks and their area effects are still controlled by TLM or the corresponding task mod.
 - Plans are dimension-specific. Searches do not actively load or generate chunks.
-- Compass plans and maid states carry independent schema versions. Unversioned legacy data loads automatically and gains a version on its next save. See [migration notes](docs/DATA-VERSIONS.md).
 
 ## Configuration
 
-`config/touhou_little_maid_custom_workspace-common.toml`; server configuration controls behavior.
+The configuration file is `config/touhou_little_maid_custom_workspace-common.toml`.
 
 | Setting | Default | Purpose |
 | --- | ---: | --- |
-| `workTicksPerArea` | 2400 | Default rotation budget and initial delay for new entries |
-| `travelTimeoutTicks` | 0 | Travel timeout in active game ticks; 0 disables skipping |
-| `maxAreasPerMaid` | 16 | Combined work, rest and sleep cuboid limit |
-| `maxAreaEdge` | 64 | Maximum length of each cuboid axis |
-| `maxAreaVolume` | 131072 | Maximum cuboid volume |
-| `candidateBudget` | 2048 | Candidates checked per task search; scanning resumes later |
-
-Custom schedules retain their explicit delays. Upgrading does not overwrite existing timeout settings.
+| `workTicksPerArea` | 2400 | Default rotation budget and initial delay for new schedule entries |
+| `travelTimeoutTicks` | 0 | Travel timeout in game ticks; 0 disables timeout skipping |
+| `maxAreasPerMaid` | 16 | Combined limit for work, rest and sleep cuboids |
+| `maxAreaEdge` | 64 | Maximum length of each axis of an area |
+| `maxAreaVolume` | 131072 | Maximum volume of an area |
+| `candidateBudget` | 2048 | Candidate block budget per task search |
 
 ## Asset License and Credits
 
-**Code is licensed under [MIT](LICENSE).** The Smart Compass artwork and associated resources are adapted from **Touhou Little Maid assets**, originally by **TartaricAcid / tartaric_acid and TLM's contributors and artists**. They are not wholly original artwork. The adaptations by hyt2002 retain **[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)**: attribution, non-commercial use and share-alike.
-
-When sharing or adapting these assets, retain the original attribution, source and license, indicate changes, and follow those terms. The code's MIT license does not relicense this artwork. See [copyright and third-party notices](NOTICE.md) and the [full asset license](LICENSE-CC), also included in the published JAR. TLM and Minecraft artwork visible in `exp.png` remains the property of the respective rightsholders.
-
-Thanks to TLM's authors and contributors, and NeoForge's template maintainers. Selection, tool-menu and schedule interactions refer to [Create](https://github.com/Creators-of-Create/Create); the addon implements its own code and rendering and does not redistribute Create code or artwork. README organization was inspired by [Maid Storage Manager](https://github.com/zxy19/maid_storage_manager).
-
-## Development
-
-Use **Java 21**. The Gradle Wrapper resolves TLM and matching sources from Modrinth Maven; do not copy TLM JARs from a game installation.
-
-```shell
-./gradlew build
-./gradlew runGameTestServer
-```
-
-On Windows, use `gradlew.bat`. The distributable is in `build/libs/`; development test classes and structures are excluded. GitHub Actions runs the build and game integration tests.
-
-[Full guide](docs/FIRST-VERSION.md) · [Routes](docs/ROUTE-GRAPH.md) · [Data migration](docs/DATA-VERSIONS.md) · [Changelog](docs/CHANGELOG.md)
+**The project's code is licensed under [MIT](LICENSE).** The Smart Compass texture artwork is adapted from **[Touhou Little Maid](https://github.com/TartaricAcid/TouhouLittleMaid)** assets. The original assets belong to **TLM's original author, TartaricAcid**, and retain **CC BY-NC-SA 4.0**.
