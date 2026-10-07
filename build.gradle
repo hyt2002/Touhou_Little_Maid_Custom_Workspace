@@ -157,6 +157,12 @@ dependencies {
     // The matching sources classifier is resolved automatically by the IDE.
     implementation "maven.modrinth:touhou-little-maid:${tlm_version}"
 
+    // Development runtime mods, pinned to their NeoForge 1.21.1 Modrinth version IDs.
+    // GuideME is required by AE2. These are not embedded in the addon JAR.
+    runtimeOnly "maven.modrinth:nbtedit-reborn:${nbtedit_modrinth_version}"
+    runtimeOnly "maven.modrinth:ae2:${ae2_modrinth_version}"
+    runtimeOnly "maven.modrinth:guideme:${guideme_modrinth_version}"
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

@@ -3,17 +3,34 @@ package com.erobrine.tlmcw.workspace;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-/** Undirected endpoints: work areas use nonnegative indices, waypoints use -index-1. */
-public record RouteEdge(int a, int b) {
-    public static final Codec<RouteEdge> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.INT.fieldOf("a").forGetter(RouteEdge::a),
-            Codec.INT.fieldOf("b").forGetter(RouteEdge::b)
-    ).apply(instance, RouteEdge::new));
+import net.minecraft.core.UUIDUtil;
+
+import java.util.UUID;
+
+public record RouteEdge(UUID a, UUID b) {
+    public static final Codec<RouteEdge> CODEC =
+            RecordCodecBuilder.create(
+                    i ->
+                            i.group(
+                                            UUIDUtil.CODEC.fieldOf("a").forGetter(RouteEdge::a),
+                                            UUIDUtil.CODEC.fieldOf("b").forGetter(RouteEdge::b))
+                                    .apply(i, RouteEdge::new));
 
     public RouteEdge {
-        if (a == b) throw new IllegalArgumentException("A route edge must connect different nodes");
-        if (a > b) { int swap = a; a = b; b = swap; }
+        if (a.equals(b)) throw new IllegalArgumentException("Self edge");
+        if (a.compareTo(b) > 0) {
+            UUID swap = a;
+            a = b;
+            b = swap;
+        }
     }
-    public boolean touches(int node) { return a == node || b == node; }
-    public int other(int node) { return a == node ? b : a; }
+
+    public boolean touches(UUID id) {
+        return a.equals(id) || b.equals(id);
+    }
+
+    public UUID other(UUID id) {
+        if (!touches(id)) throw new IllegalArgumentException("Not an endpoint");
+        return a.equals(id) ? b : a;
+    }
 }

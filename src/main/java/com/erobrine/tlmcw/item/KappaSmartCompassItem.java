@@ -2,6 +2,7 @@ package com.erobrine.tlmcw.item;
 
 import com.erobrine.tlmcw.workspace.CompassEditor;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -21,14 +22,18 @@ public final class KappaSmartCompassItem extends Item {
     public InteractionResult useOn(UseOnContext context) {
         return CompassEditor.useOn(context);
     }
+
     @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+    public InteractionResultHolder<ItemStack> use(
+            Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand == InteractionHand.MAIN_HAND && CompassEditor.mode(stack) == CompassEditor.ROUTE_NODES) {
+        if (hand == InteractionHand.MAIN_HAND
+                && CompassEditor.mode(stack) == CompassEditor.ROUTE_NODES) {
             CompassEditor.routeClick(stack, player);
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
-        if (hand == InteractionHand.MAIN_HAND && CompassEditor.mode(stack) == CompassEditor.MARK_AREAS) {
+        if (hand == InteractionHand.MAIN_HAND
+                && CompassEditor.mode(stack) == CompassEditor.MARK_AREAS) {
             CompassEditor.markClick(stack, player);
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
@@ -36,8 +41,10 @@ public final class KappaSmartCompassItem extends Item {
     }
 
     @Override
-    public InteractionResult interactLivingEntity(ItemStack stack, Player player, LivingEntity entity, InteractionHand hand) {
-        if (entity instanceof EntityMaid maid) return CompassEditor.apply(stack, player, maid, hand);
+    public InteractionResult interactLivingEntity(
+            ItemStack stack, Player player, LivingEntity entity, InteractionHand hand) {
+        if (entity instanceof EntityMaid maid)
+            return CompassEditor.interactMaid(stack, player, maid, hand);
         return super.interactLivingEntity(stack, player, entity, hand);
     }
 }

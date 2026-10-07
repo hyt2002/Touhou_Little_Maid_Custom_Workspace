@@ -1,103 +1,375 @@
 package com.erobrine.tlmcw.workspace;
 
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.*;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import java.util.List;
 
-/** Persistent schedule destination and independent work rotation progress. */
-public record WorkspaceState(WorkspacePlan plan, int activeIndex, long workTicks, boolean travelling,
-                             List<Integer> remainingRoute, AreaType scheduleType, int workIndex,
-                             int scheduleIndex, boolean scheduleFinished) {
-    public static final Codec<WorkspaceState> CODEC = WorkspaceDataVersions.maidState(RecordCodecBuilder.create(instance -> instance.group(
-            WorkspacePlan.CODEC.fieldOf("plan").forGetter(WorkspaceState::plan),
-            Codec.INT.fieldOf("active_index").forGetter(WorkspaceState::activeIndex),
-            Codec.LONG.optionalFieldOf("work_ticks", 0L).forGetter(WorkspaceState::workTicks),
-            Codec.BOOL.optionalFieldOf("travelling", true).forGetter(WorkspaceState::travelling),
-            Codec.INT.listOf(0, RouteGraph.MAX_POINTS + 64).optionalFieldOf("remaining_route", List.of()).forGetter(WorkspaceState::remainingRoute),
-            AreaType.CODEC.optionalFieldOf("schedule_type", AreaType.WORK).forGetter(WorkspaceState::scheduleType),
-            Codec.INT.optionalFieldOf("work_index", -1).forGetter(WorkspaceState::workIndex),
-            Codec.INT.optionalFieldOf("schedule_index", 0).forGetter(WorkspaceState::scheduleIndex),
-            Codec.BOOL.optionalFieldOf("schedule_finished", false).forGetter(WorkspaceState::scheduleFinished)
-    ).apply(instance, WorkspaceState::new)));
+import net.minecraft.core.UUIDUtil;
+
+import java.util.*;
+
+/**
+ * UUID references only. Work progress survives idle/sleep schedules independently of the active
+ * destination.
+ */
+public record WorkspaceState(
+        WorkspacePlan plan,
+        UUID destinationId,
+        long workTicks,
+        boolean travelling,
+        List<UUID> remainingRoute,
+        AreaType scheduleType,
+        UUID workDestination,
+        UUID entryId,
+        boolean scheduleFinished,
+        boolean suspended,
+        boolean waitingDimension,
+        Dynamic<?> unreadableData) {
+    private record Work(
+            Optional<UUID> destination, Optional<UUID> entry, long elapsed, boolean finished) {
+        static final Codec<Work> CODEC =
+                RecordCodecBuilder.create(
+                        i ->
+                                i.group(
+                                                UUIDUtil.CODEC
+                                                        .optionalFieldOf("destination")
+                                                        .forGetter(Work::destination),
+                                                UUIDUtil.CODEC
+                                                        .optionalFieldOf("entry")
+                                                        .forGetter(Work::entry),
+                                                Codec.LONG
+                                                        .optionalFieldOf("elapsed_ticks", 0L)
+                                                        .forGetter(Work::elapsed),
+                                                Codec.BOOL
+                                                        .optionalFieldOf("finished", false)
+                                                        .forGetter(Work::finished))
+                                        .apply(i, Work::new));
+    }
+
+    private record Runtime(
+            AreaType type, String phase, Optional<UUID> destination, List<UUID> route, Work work) {
+        static final Codec<Runtime> CODEC =
+                RecordCodecBuilder.create(
+                        i ->
+                                i.group(
+                                                AreaType.CODEC
+                                                        .fieldOf("schedule_type")
+                                                        .forGetter(Runtime::type),
+                                                Codec.STRING
+                                                        .fieldOf("phase")
+                                                        .forGetter(Runtime::phase),
+                                                UUIDUtil.CODEC
+                                                        .optionalFieldOf("destination")
+                                                        .forGetter(Runtime::destination),
+                                                UUIDUtil.CODEC
+                                                        .listOf(0, 320)
+                                                        .optionalFieldOf(
+                                                                "remaining_route", List.of())
+                                                        .forGetter(Runtime::route),
+                                                Work.CODEC.fieldOf("work").forGetter(Runtime::work))
+                                        .apply(i, Runtime::new));
+    }
+
+    static final Codec<WorkspaceState> BODY_CODEC =
+            RecordCodecBuilder.create(
+                    i ->
+                            i.group(
+                                            WorkspacePlan.CODEC
+                                                    .fieldOf("plan")
+                                                    .forGetter(WorkspaceState::plan),
+                                            Runtime.CODEC
+                                                    .fieldOf("runtime")
+                                                    .forGetter(WorkspaceState::runtime))
+                                    .apply(i, WorkspaceState::fromRuntime));
+    public static final Codec<WorkspaceState> CODEC =
+            WorkspaceDataVersions.preserving(
+                    WorkspaceDataVersions.maidState(BODY_CODEC),
+                    WorkspaceState::unreadable,
+                    WorkspaceState::unreadableData);
+
+    private Runtime runtime() {
+        return new Runtime(
+                scheduleType,
+                suspended
+                        ? "suspended"
+                        : waitingDimension ? "waiting_dimension" : travelling ? "travel" : "active",
+                Optional.ofNullable(destinationId),
+                remainingRoute,
+                new Work(
+                        Optional.ofNullable(workDestination),
+                        Optional.ofNullable(entryId),
+                        workTicks,
+                        scheduleFinished));
+    }
+
+    private static WorkspaceState fromRuntime(WorkspacePlan plan, Runtime r) {
+        if (!plan.readable()
+                || !Set.of("suspended", "waiting_dimension", "travel", "active")
+                        .contains(r.phase()))
+            throw new IllegalArgumentException("Unreadable runtime");
+        return new WorkspaceState(
+                plan,
+                r.destination().orElse(null),
+                r.work().elapsed(),
+                !r.phase().equals("active"),
+                r.route(),
+                r.type(),
+                r.work().destination().orElse(null),
+                r.work().entry().orElse(null),
+                r.work().finished(),
+                r.phase().equals("suspended"),
+                r.phase().equals("waiting_dimension"),
+                null);
+    }
 
     public WorkspaceState {
-        activeIndex = plan.areas().isEmpty() ? 0 : Math.floorMod(activeIndex, plan.areas().size());
-        workTicks = Math.max(0, workTicks);
-        var work = plan.nodes(AreaType.WORK);
-        if (!work.contains(workIndex)) workIndex = scheduleType == AreaType.WORK && work.contains(activeIndex)
-                ? activeIndex : work.isEmpty() ? -1 : work.getFirst();
-        if (plan.schedule().custom()) {
-            scheduleIndex = Math.floorMod(scheduleIndex, plan.schedule().entries().size());
-            workIndex = plan.schedule().entries().get(scheduleIndex).area();
-            if (plan.schedule().cyclic()) scheduleFinished = false;
-        } else { scheduleIndex = 0; scheduleFinished = false; }
         remainingRoute = List.copyOf(remainingRoute);
-        boolean valid = travelling && !remainingRoute.isEmpty() && remainingRoute.getLast() == activeIndex;
+        if (workTicks < 0 || scheduleType == AreaType.WAYPOINT)
+            throw new IllegalArgumentException("Invalid runtime");
+        if (destinationId != null
+                && (plan.node(destinationId) == null || !plan.node(destinationId).isArea()))
+            throw new IllegalArgumentException("Missing destination");
+        if (workDestination != null
+                && (plan.node(workDestination) == null
+                        || plan.type(workDestination) != AreaType.WORK))
+            throw new IllegalArgumentException("Missing work destination");
+        if (plan.schedule().custom() && entryId == null
+                || !plan.nodes(AreaType.WORK).isEmpty() && workDestination == null)
+            throw new IllegalArgumentException("Missing work runtime reference");
+        if (!suspended && !plan.areaIds().isEmpty() && destinationId == null)
+            throw new IllegalArgumentException("Missing active destination");
+        if (entryId != null
+                && (plan.schedule().entry(entryId) == null
+                        || !plan.schedule().entry(entryId).destination().equals(workDestination)))
+            throw new IllegalArgumentException("Missing schedule entry");
+        if (!suspended && destinationId != null && plan.type(destinationId) != scheduleType)
+            throw new IllegalArgumentException("Schedule type mismatch");
+        boolean valid =
+                travelling
+                        && !remainingRoute.isEmpty()
+                        && Objects.equals(remainingRoute.getLast(), destinationId);
         for (int i = 0; valid && i < remainingRoute.size(); i++) {
-            valid = plan.graph().hasNode(remainingRoute.get(i), plan.areas().size());
-            if (valid && i > 0) valid = remainingRoute.get(i - 1).intValue() != remainingRoute.get(i).intValue()
-                    && plan.graph().edges().contains(new RouteEdge(remainingRoute.get(i - 1), remainingRoute.get(i)));
+            UUID id = remainingRoute.get(i);
+            valid = plan.node(id) != null;
+            if (valid && i > 0)
+                valid =
+                        !remainingRoute.get(i - 1).equals(id)
+                                && plan.graph()
+                                        .edges()
+                                        .contains(new RouteEdge(remainingRoute.get(i - 1), id));
         }
-        if (!valid) remainingRoute = List.of();
+        if (!valid && !remainingRoute.isEmpty()) {
+            remainingRoute = List.of();
+            travelling = true;
+            suspended = true;
+        }
     }
-    public WorkspaceState(WorkspacePlan plan, int activeIndex, long workTicks, boolean travelling, List<Integer> remainingRoute) {
-        this(plan, activeIndex, workTicks, travelling, remainingRoute, AreaType.WORK, activeIndex);
+
+    public WorkspaceState(
+            WorkspacePlan p,
+            UUID dest,
+            long ticks,
+            boolean travel,
+            List<UUID> route,
+            AreaType type,
+            UUID work,
+            UUID entry,
+            boolean finished,
+            boolean suspended) {
+        this(p, dest, ticks, travel, route, type, work, entry, finished, suspended, false, null);
     }
-    public WorkspaceState(WorkspacePlan plan, int activeIndex, long workTicks, boolean travelling,
-                          List<Integer> remainingRoute, AreaType scheduleType, int workIndex) {
-        this(plan, activeIndex, workTicks, travelling, remainingRoute, scheduleType, workIndex,
-                plan.schedule().indexOfArea(workIndex), false);
+
+    static WorkspaceState unreadable(Dynamic<?> raw) {
+        return new WorkspaceState(
+                WorkspacePlan.unreadable(raw),
+                null,
+                0,
+                true,
+                List.of(),
+                AreaType.WORK,
+                null,
+                null,
+                false,
+                true,
+                false,
+                raw);
     }
-    public WorkspaceState(WorkspacePlan plan, int activeIndex, long workTicks, boolean travelling) {
-        this(plan, activeIndex, workTicks, travelling, List.of());
+
+    public boolean readable() {
+        return unreadableData == null && plan.readable();
     }
-    public static WorkspaceState initial(WorkspacePlan plan) {
-        var work = plan.nodes(AreaType.WORK);
-        int index = plan.schedule().custom() ? plan.schedule().entries().getFirst().area() : work.isEmpty() ? 0 : work.getFirst();
-        return new WorkspaceState(plan, index, 0, true, List.of(), plan.areas().isEmpty() ? AreaType.WORK : plan.type(index), index);
+
+    public static WorkspaceState initial(WorkspacePlan p) {
+        var work = p.nodes(AreaType.WORK);
+        UUID entry = p.schedule().custom() ? p.schedule().entries().getFirst().id() : null;
+        UUID dest =
+                entry != null
+                        ? p.schedule().entry(entry).destination()
+                        : work.isEmpty()
+                                ? p.areaIds().stream().findFirst().orElse(null)
+                                : work.getFirst();
+        return new WorkspaceState(
+                p,
+                dest,
+                0,
+                true,
+                List.of(),
+                dest == null ? AreaType.WORK : p.type(dest),
+                work.isEmpty() ? null : dest,
+                entry,
+                false,
+                false);
     }
-    public WorkArea activeArea() { return plan.areas().get(activeIndex); }
-    public WorkArea navigationArea() { return remainingRoute.isEmpty() ? activeArea() : plan.nodeArea(remainingRoute.getFirst()); }
-    public WorkspaceState withTravel(boolean value) { return new WorkspaceState(plan, activeIndex, workTicks, value, remainingRoute, scheduleType, workIndex, scheduleIndex, scheduleFinished); }
-    public WorkspaceState withRoute(List<Integer> route) { return new WorkspaceState(plan, activeIndex, workTicks, travelling, route, scheduleType, workIndex, scheduleIndex, scheduleFinished); }
+
+    public WorkArea activeArea() {
+        return plan.nodeArea(destinationId);
+    }
+
+    public WorkArea navigationArea() {
+        return plan.nodeArea(remainingRoute.isEmpty() ? destinationId : remainingRoute.getFirst());
+    }
+
+    public WorkspaceState withTravel(boolean value) {
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                workTicks,
+                value,
+                value ? remainingRoute : List.of(),
+                scheduleType,
+                workDestination,
+                entryId,
+                scheduleFinished,
+                suspended,
+                value && waitingDimension,
+                null);
+    }
+
+    public WorkspaceState withRoute(List<UUID> route) {
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                workTicks,
+                travelling,
+                route,
+                scheduleType,
+                workDestination,
+                entryId,
+                scheduleFinished,
+                suspended,
+                waitingDimension,
+                null);
+    }
+
     public WorkspaceState suspend(AreaType type) {
-        // Keep the custom destination/progress while the current schedule uses its original TLM area.
-        return new WorkspaceState(plan, activeIndex, workTicks, true, remainingRoute, type, workIndex, scheduleIndex, scheduleFinished);
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                workTicks,
+                true,
+                remainingRoute,
+                type,
+                workDestination,
+                entryId,
+                scheduleFinished,
+                true);
     }
-    public WorkspaceState advanceRoute() { return withRoute(remainingRoute.subList(1, remainingRoute.size())); }
+
+    public UUID navigationId() {
+        return remainingRoute.isEmpty() ? destinationId : remainingRoute.getFirst();
+    }
+
+    public WorkspaceState withWaitingDimension(boolean value) {
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                workTicks,
+                true,
+                remainingRoute,
+                scheduleType,
+                workDestination,
+                entryId,
+                scheduleFinished,
+                false,
+                value,
+                null);
+    }
+
+    public WorkspaceState advanceRoute() {
+        return withRoute(remainingRoute.subList(1, remainingRoute.size()));
+    }
+
     public WorkspaceState destination(AreaType type, RoutePlanner.Route route) {
-        return new WorkspaceState(plan, route.destination(), workTicks, true, route.remaining(), type,
-                type == AreaType.WORK ? route.destination() : workIndex, scheduleIndex, scheduleFinished);
+        if (route == null) return suspend(type);
+        return new WorkspaceState(
+                plan,
+                route.destination(),
+                workTicks,
+                true,
+                route.remaining(),
+                type,
+                type == AreaType.WORK ? route.destination() : workDestination,
+                entryId,
+                scheduleFinished,
+                false);
     }
+
     public boolean hasNextWorkDestination() {
         if (!plan.schedule().custom()) return plan.nodes(AreaType.WORK).size() > 1;
-        return !scheduleFinished && (scheduleIndex + 1 < plan.schedule().entries().size()
-                || plan.schedule().cyclic() && plan.schedule().entries().size() > 1);
+        int position = plan.schedule().position(entryId);
+        return !scheduleFinished
+                && (position + 1 < plan.schedule().entries().size()
+                        || plan.schedule().cyclic() && plan.schedule().entries().size() > 1);
     }
+
     public WorkspaceState next() {
         var work = plan.nodes(AreaType.WORK);
         if (work.isEmpty()) return this;
-        int cursor = scheduleIndex;
-        int next;
+        UUID next, entry = null;
         if (plan.schedule().custom()) {
             if (!hasNextWorkDestination()) return this;
-            cursor = (scheduleIndex + 1) % plan.schedule().entries().size();
-            next = plan.schedule().entries().get(cursor).area();
-        } else next = work.get((work.indexOf(workIndex) + 1) % work.size());
-        var route = plan.graph().shortestPath(plan, activeIndex, next);
-        return new WorkspaceState(plan, next, 0, true, route.isEmpty() ? List.of() : route.subList(1, route.size()), AreaType.WORK, next, cursor, false);
+            var e =
+                    plan.schedule()
+                            .entries()
+                            .get(
+                                    (plan.schedule().position(entryId) + 1)
+                                            % plan.schedule().entries().size());
+            next = e.destination();
+            entry = e.id();
+        } else next = work.get((work.indexOf(workDestination) + 1) % work.size());
+        var route = plan.graph().shortestPath(plan, destinationId, next);
+        return new WorkspaceState(
+                plan,
+                next,
+                0,
+                true,
+                route.isEmpty() ? List.of() : route.subList(1, route.size()),
+                AreaType.WORK,
+                next,
+                entry,
+                false,
+                false);
     }
-    public WorkspaceState countWork(long intervalTicks) {
-        if (travelling || scheduleType != AreaType.WORK || scheduleFinished) return this;
-        if (plan.schedule().custom()) intervalTicks = plan.schedule().entries().get(scheduleIndex).condition().ticks();
-        long elapsed = workTicks + 1;
-        int count = plan.nodes(AreaType.WORK).size();
+
+    public WorkspaceState countWork(long interval) {
+        if (travelling || suspended || scheduleType != AreaType.WORK || scheduleFinished)
+            return this;
+        if (plan.schedule().custom()) interval = plan.schedule().entry(entryId).condition().ticks();
+        long elapsed = workTicks == Long.MAX_VALUE ? Long.MAX_VALUE : workTicks + 1;
         boolean finished = false;
-        if (elapsed >= intervalTicks) {
+        if (elapsed >= interval) {
             if (hasNextWorkDestination()) return next();
             finished = plan.schedule().custom() && !plan.schedule().cyclic();
         }
-        return new WorkspaceState(plan, activeIndex, count == 1 || plan.schedule().custom() && !hasNextWorkDestination() ? Math.min(elapsed, intervalTicks) : elapsed,
-                false, List.of(), scheduleType, workIndex, scheduleIndex, finished);
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                hasNextWorkDestination() ? elapsed : Math.min(elapsed, interval),
+                false,
+                List.of(),
+                scheduleType,
+                workDestination,
+                entryId,
+                finished,
+                false);
     }
 }
