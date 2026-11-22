@@ -30,7 +30,8 @@ public final class CompassEditor {
             RENAME_AREAS = 4,
             SCHEDULE_OPTIONS = 5,
             READ_FROM_MAID = 6,
-            TOOL_COUNT = 7;
+            MERGE_WORK_AREAS = 7,
+            TOOL_COUNT = 8;
     // Display order is independent of the persisted mode IDs used by existing compasses.
     public static final java.util.List<Integer> TOOL_ORDER =
             java.util.List.of(
@@ -39,6 +40,7 @@ public final class CompassEditor {
                     ROUTE_NODES,
                     MARK_AREAS,
                     RENAME_AREAS,
+                    MERGE_WORK_AREAS,
                     SCHEDULE_OPTIONS,
                     APPLY_TO_MAID);
 
@@ -67,6 +69,7 @@ public final class CompassEditor {
                     case RENAME_AREAS -> "mode_rename";
                     case SCHEDULE_OPTIONS -> "mode_schedule";
                     case READ_FROM_MAID -> "mode_read";
+                    case MERGE_WORK_AREAS -> "mode_merge";
                     default -> "mode_work";
                 });
     }
@@ -105,8 +108,9 @@ public final class CompassEditor {
             message(player, "aim_maid");
             return InteractionResult.CONSUME;
         }
-        if (mode(stack) == RENAME_AREAS || mode(stack) == SCHEDULE_OPTIONS)
-            return InteractionResult.CONSUME;
+        if (mode(stack) == RENAME_AREAS
+                || mode(stack) == SCHEDULE_OPTIONS
+                || mode(stack) == MERGE_WORK_AREAS) return InteractionResult.CONSUME;
         if (player.isShiftKeyDown()) {
             cancelSelection(stack);
             message(player, "selection_cancelled");

@@ -38,7 +38,7 @@ final class WorkScheduleScreen extends PaperScreen {
 
     private void seedDefaults() {
         entries.clear();
-        for (UUID area : plan.nodes(AreaType.WORK))
+        for (UUID area : plan.defaultWorkDestinations())
             entries.add(new WorkScheduleEntry(area, new DelayCondition(Config.WORK_TICKS.get())));
     }
 

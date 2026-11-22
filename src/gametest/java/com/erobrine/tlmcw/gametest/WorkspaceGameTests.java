@@ -21,6 +21,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.schedule.Activity;
 import net.minecraft.world.item.ItemStack;
@@ -84,6 +85,207 @@ public final class WorkspaceGameTests {
         return fixturePlan(
                 helper.getLevel().dimension().location(),
                 List.of(area(helper, 3), area(helper, 12)));
+    }
+
+    @GameTest(template = "test_empty", timeoutTicks = 480)
+    public static void groupedWorkKeepsOneIntentAcrossWaypointsAndFinishesOutsideBox(
+            GameTestHelper helper) {
+        floor(helper);
+        for (int z = 1; z <= 8; z++)
+            for (int y = 2; y <= 5; y++) helper.setBlock(9, y, z, Blocks.STONE);
+        var maid = maid(helper);
+        BlockPos first = helper.absolutePos(new BlockPos(7, 2, 10));
+        BlockPos second = helper.absolutePos(new BlockPos(8, 2, 10));
+        BlockPos third = helper.absolutePos(new BlockPos(10, 2, 10));
+        BlockPos table = helper.absolutePos(new BlockPos(20, 2, 5));
+        BlockPos gap = helper.absolutePos(new BlockPos(8, 2, 5));
+        var plan =
+                attach(
+                        plan(helper)
+                                .withWorkGroup(n(0), "Restaurant")
+                                .withWorkGroup(n(1), "Restaurant"),
+                        new FixtureGraph(List.of(first, second, third), List.of())
+                                .connect(n(0), n(-1))
+                                .connect(n(-1), n(-2))
+                                .connect(n(-2), n(-3))
+                                .connect(n(-3), n(1)));
+        WorkspaceController.apply(maid, plan);
+        var intent = new net.minecraft.world.entity.ai.memory.WalkTarget(table, 0.55f, 0);
+        boolean[] issued = {false};
+        boolean[] served = {false};
+        var work =
+                new net.minecraft.world.entity.ai.behavior.Behavior<EntityMaid>(
+                        java.util.Map.of(), 45) {
+                    @Override
+                    protected boolean checkExtraStartConditions(
+                            net.minecraft.server.level.ServerLevel level, EntityMaid worker) {
+                        return !issued[0];
+                    }
+
+                    @Override
+                    protected void start(
+                            net.minecraft.server.level.ServerLevel level,
+                            EntityMaid worker,
+                            long time) {
+                        issued[0] = true;
+                        worker.getBrain().setMemory(MemoryModuleType.WALK_TARGET, intent);
+                    }
+
+                    @Override
+                    protected boolean canStillUse(
+                            net.minecraft.server.level.ServerLevel level,
+                            EntityMaid worker,
+                            long time) {
+                        return !worker.blockPosition().equals(table);
+                    }
+
+                    @Override
+                    protected void stop(
+                            net.minecraft.server.level.ServerLevel level,
+                            EntityMaid worker,
+                            long time) {
+                        served[0] = worker.blockPosition().equals(table);
+                        worker.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+                    }
+                };
+        maid.getBrain()
+                .addActivity(
+                        Activity.WORK,
+                        com.google.common.collect.ImmutableList.of(
+                                com.mojang.datafixers.util.Pair.of(
+                                        5, new WorkspaceBehaviorGate(work, Activity.WORK))));
+        var visited = new java.util.HashSet<BlockPos>();
+        boolean[] leftDestination = {false};
+        boolean[] reachedMember = {false};
+        helper.onEachTick(
+                () -> {
+                    if (!issued[0] || served[0]) return;
+                    var pos = maid.blockPosition();
+                    visited.add(pos);
+                    var state = WorkspaceLogic.active(maid);
+                    helper.assertTrue(
+                            !state.travelling() && state.destinationId().equals(n(0)),
+                            "Task movement changed the work schedule");
+                    helper.assertTrue(
+                            maid.getBrain().getMemory(MemoryModuleType.WALK_TARGET).orElse(null)
+                                    == intent,
+                            "The work behavior lost its original walk target before reaching the"
+                                    + " table");
+                    helper.assertTrue(
+                            maid.isWithinRestriction(plan.nodeArea(n(1)).center())
+                                    && !maid.isWithinRestriction(gap)
+                                    && !maid.isWithinRestriction(table),
+                            "Working bounds should include both members and exclude the gap and"
+                                    + " table");
+                    if (plan.nodeArea(n(1)).contains(pos)) {
+                        helper.assertTrue(
+                                !leftDestination[0],
+                                "Final walk sent the maid back to the entry area");
+                        reachedMember[0] = true;
+                    } else if (reachedMember[0]) leftDestination[0] = true;
+                });
+        helper.succeedWhen(
+                () -> {
+                    helper.assertTrue(
+                            served[0],
+                            "The timed work behavior did not finish at the outside table");
+                    helper.assertTrue(
+                            visited.containsAll(List.of(first, second, third))
+                                    && reachedMember[0]
+                                    && leftDestination[0],
+                            "The task missed a waypoint or did not finish its final leg outside the"
+                                    + " member");
+                    helper.assertTrue(
+                            WorkspaceLogic.active(maid).travelling(),
+                            "Return to the work group did not resume after the job removed the"
+                                    + " target");
+                });
+    }
+
+    @GameTest(template = "test_empty", timeoutTicks = 460)
+    public static void groupedBlockSearchFindsWorkInAnotherMember(GameTestHelper helper) {
+        floor(helper);
+        var maid = maid(helper);
+        maid.setTask(new TaskNormalFarm());
+        maid.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_HOE));
+        maid.getAvailableInv(true).insertItem(0, new ItemStack(Items.WHEAT_SEEDS, 32), false);
+        helper.setBlock(12, 1, 3, Blocks.FARMLAND);
+        helper.setBlock(12, 2, 3, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+        helper.setBlock(9, 1, 3, Blocks.FARMLAND);
+        helper.setBlock(9, 2, 3, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+        var plan =
+                attach(
+                        plan(helper).withWorkGroup(n(0), "Farm").withWorkGroup(n(1), "Farm"),
+                        new FixtureGraph(
+                                        List.of(helper.absolutePos(new BlockPos(9, 2, 6))),
+                                        List.of())
+                                .connect(n(0), n(-1))
+                                .connect(n(-1), n(1)));
+        WorkspaceController.apply(maid, plan);
+        helper.succeedWhen(
+                () -> {
+                    var state = WorkspaceLogic.active(maid);
+                    helper.assertTrue(
+                            state.destinationId().equals(n(0)) && !state.travelling(),
+                            "Searching the other member switched schedule entries");
+                    helper.assertTrue(
+                            helper.getBlockState(new BlockPos(9, 2, 3)).is(Blocks.WHEAT)
+                                    && helper.getBlockState(new BlockPos(9, 2, 3))
+                                                    .getValue(CropBlock.AGE)
+                                            == 7,
+                            "The shared search considered a crop in the gap");
+                    var crop = helper.getBlockState(new BlockPos(12, 2, 3));
+                    helper.assertTrue(
+                            !crop.is(Blocks.WHEAT) || crop.getValue(CropBlock.AGE) < 7,
+                            "Did not find and harvest the crop in the other member");
+                });
+    }
+
+    @GameTest(template = "test_empty", timeoutTicks = 300)
+    public static void blockedGroupWaypointReleasesTheWorkTarget(GameTestHelper helper) {
+        floor(helper);
+        for (int z = 1; z <= 14; z++)
+            for (int y = 2; y <= 5; y++) helper.setBlock(9, y, z, Blocks.STONE);
+        var maid = maid(helper);
+        var plan =
+                attach(
+                        plan(helper)
+                                .withWorkGroup(n(0), "Test group")
+                                .withWorkGroup(n(1), "Test group"),
+                        new FixtureGraph(
+                                        List.of(helper.absolutePos(new BlockPos(9, 2, 4))),
+                                        List.of())
+                                .connect(n(0), n(-1))
+                                .connect(n(-1), n(1)));
+        WorkspaceController.apply(maid, plan);
+        var intent = new WalkTarget(plan.nodeArea(n(1)).navigationCenter(), 0.55f, 0);
+        helper.runAtTickTime(
+                15,
+                () -> {
+                    helper.assertTrue(WorkspaceLogic.mayWork(maid), "Work group did not activate");
+                    maid.moveTo(helper.absoluteVec(new Vec3(8.5, 2, 4.5)));
+                    maid.getBrain().setMemory(MemoryModuleType.WALK_TARGET, intent);
+                });
+        helper.runAtTickTime(
+                16,
+                () ->
+                        helper.assertTrue(
+                                maid.getBrain().getMemory(MemoryModuleType.WALK_TARGET).orElse(null)
+                                                == intent
+                                        && !WorkspaceLogic.active(maid).travelling(),
+                                "The job did not retain its walk target on the first routing"
+                                    + " attempt"));
+        helper.succeedWhen(
+                () ->
+                        helper.assertTrue(
+                                helper.getTick() > 16
+                                        && WorkspaceLogic.active(maid).travelling()
+                                        && maid.getBrain()
+                                                        .getMemory(MemoryModuleType.WALK_TARGET)
+                                                        .orElse(null)
+                                                != intent,
+                                "A blocked waypoint kept a stale task target and prevented the"
+                                        + " return to work"));
     }
 
     @GameTest(template = "test_empty", timeoutTicks = 500)
@@ -352,8 +554,9 @@ public final class WorkspaceGameTests {
                             .getCompound("MaidTaskDataMaps")
                             .getCompound(maidKey);
             helper.assertTrue(
-                    resaved.getInt("data_version") == 2
-                            && resaved.getCompound("plan").getInt("data_version") == 2,
+                    resaved.getInt("data_version") == WorkspaceDataVersions.MAID_STATE_VERSION
+                            && resaved.getCompound("plan").getInt("data_version")
+                                    == WorkspaceDataVersions.PLAN_VERSION,
                     "Maid did not immediately become V2");
             helper.assertTrue(
                     expected.equals(
@@ -374,7 +577,7 @@ public final class WorkspaceGameTests {
             var encoded = (CompoundTag) loaded.save(helper.getLevel().registryAccess());
             helper.assertTrue(
                     encoded.getCompound("components").getCompound(planKey).getInt("data_version")
-                            == 2,
+                            == WorkspaceDataVersions.PLAN_VERSION,
                     "Compass was not migrated on its first read");
             WorkspaceAccess.writePlan(
                     loaded, WorkspacePlan.empty(helper.getLevel().dimension().location()));
@@ -1113,10 +1316,9 @@ public final class WorkspaceGameTests {
                                                     target.getTarget()
                                                             .currentBlockPosition()
                                                             .equals(
-                                                                    state.navigationArea()
+                                                                    state.activeArea()
                                                                             .navigationCenter()),
-                                                    "Periodic return overwrote the current route"
-                                                            + " node");
+                                                    "Route replaced the final walk target");
                                             helper.assertTrue(
                                                     target.getCloseEnoughDist() == 0,
                                                     "Route node uses an arrival tolerance");
@@ -1705,8 +1907,16 @@ public final class WorkspaceGameTests {
                             .map(
                                     walk ->
                                             walk.getTarget()
-                                                    .currentBlockPosition()
-                                                    .equals(entry.bounds().navigationCenter()))
+                                                            .currentBlockPosition()
+                                                            .equals(
+                                                                    target.bounds()
+                                                                            .navigationCenter())
+                                                    && entry.bounds()
+                                                            .navigationCenter()
+                                                            .equals(
+                                                                    WorkspaceNavigation
+                                                                            .intermediateTarget(
+                                                                                    arrived, walk)))
                             .orElse(false),
                     "Navigation did not target the nearest entry in the actual new dimension");
         } finally {
@@ -1746,7 +1956,7 @@ public final class WorkspaceGameTests {
             helper.assertTrue(
                     !maid.isOnPortalCooldown(),
                     "Player-equivalent cooldown did not expire after 10 game ticks outside a"
-                        + " portal");
+                            + " portal");
 
             var nether =
                     helper.getLevel().getServer().getLevel(net.minecraft.world.level.Level.NETHER);
@@ -1788,7 +1998,7 @@ public final class WorkspaceGameTests {
                             && saved.suspend(saved.scheduleType())
                                     .equals(WorkspaceAccess.state(transferred)),
                     "Transfer lost the player cooldown or failed to preserve progress for"
-                        + " replanning");
+                            + " replanning");
         } finally {
             Config.MAID_DIMENSION_COMPATIBILITY.set(configured);
             if (transferred != null) transferred.discard();

@@ -12,6 +12,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -32,6 +33,8 @@ import java.util.concurrent.CompletableFuture;
  * Sends clicks through Minecraft's mapped key pipeline and real client/server item interactions.
  */
 public final class ClientCompassControlsTest {
+    private static final String GROUP_NAME = "Restaurant";
+
     private record Binding(KeyMapping mapping, InputConstants.Key key, KeyModifier modifier) {
         Binding(KeyMapping mapping) {
             this(mapping, mapping.getKey(), mapping.getKeyModifier());
@@ -63,6 +66,9 @@ public final class ClientCompassControlsTest {
                                         steps.add(new Step(CompassEditor.ROUTE_NODES, true, 1));
                                         steps.add(new Step(CompassEditor.ROUTE_NODES, true, 2));
                                         steps.add(new Step(CompassEditor.ROUTE_NODES, true, 3));
+                                        steps.add(
+                                                new Step(
+                                                        CompassEditor.MERGE_WORK_AREAS, false, -1));
                                         return List.copyOf(steps);
                                     }));
     private static List<Binding> originals;
@@ -157,7 +163,7 @@ public final class ClientCompassControlsTest {
                                         mc.getSingleplayerServer()
                                                 .getPlayerList()
                                                 .getPlayer(mc.player.getUUID());
-                                player.teleportTo(0.5, -60, 0.5);
+                                player.teleportTo(0.5, -60, target < 0 ? -5.5 : 0.5);
                                 if (maid == null) {
                                     maid = new EntityMaid(player.serverLevel());
                                     maid.setTame(true, true);
@@ -176,6 +182,9 @@ public final class ClientCompassControlsTest {
                                         new ItemStack(WorkspaceItems.KAPPA_SMART_COMPASS.get());
                                 stack.set(WorkspaceComponents.PLAN.get(), base);
                                 stack.set(WorkspaceComponents.EDIT_MODE.get(), mode);
+                                if (mode == CompassEditor.MERGE_WORK_AREAS && target == 0)
+                                    stack.set(
+                                            WorkspaceComponents.WORK_GROUP_NAME.get(), GROUP_NAME);
                                 if (target > 0)
                                     stack.set(WorkspaceComponents.ROUTE_ANCHOR.get(), n(0));
                                 player.getInventory().setItem(0, stack);
@@ -277,6 +286,23 @@ public final class ClientCompassControlsTest {
                 return;
             }
             if (++ticks < 10) return;
+            if (mode == CompassEditor.MERGE_WORK_AREAS && target < 0 && phase == 2) {
+                check(
+                        mc.screen != null
+                                && mc.screen.getClass().getSimpleName().equals("RenameAreaScreen"),
+                        "Using the merge tool outside a work area did not open the group editor");
+                EditBox name =
+                        mc.screen.children().stream()
+                                .filter(EditBox.class::isInstance)
+                                .map(EditBox.class::cast)
+                                .findFirst()
+                                .orElseThrow();
+                name.setValue(GROUP_NAME);
+                check(mc.screen.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0), "Group editor did not save");
+                phase = 3;
+                ticks = 0;
+                return;
+            }
             verify(mc, STEPS.get(step));
             System.out.println(
                     "TLMCW_CONTROLS_STEP "
@@ -335,7 +361,7 @@ public final class ClientCompassControlsTest {
                     check(
                             plan.equals(base) && !stack.has(WorkspaceComponents.ROUTE_ANCHOR.get()),
                             "Mapped attack did not cancel the link without deleting nodes or"
-                                + " edges");
+                                    + " edges");
                     break;
                 }
                 check(
@@ -351,6 +377,18 @@ public final class ClientCompassControlsTest {
                     check(
                             plan.type(n(0)) == (action.attack() ? AreaType.WORK : AreaType.IDLE),
                             "Marking accepted attack or failed on use");
+            case CompassEditor.MERGE_WORK_AREAS -> {
+                WorkspacePlan expected =
+                        action.attack() || action.target() < 0
+                                ? base
+                                : base.withWorkGroup(n(0), GROUP_NAME);
+                check(
+                        plan.equals(expected) && mc.screen == null,
+                        "Merge accepted attack or failed on use");
+                check(
+                        GROUP_NAME.equals(stack.get(WorkspaceComponents.WORK_GROUP_NAME.get())),
+                        "The compass did not retain the selected group name");
+            }
             case CompassEditor.RENAME_AREAS, CompassEditor.SCHEDULE_OPTIONS -> {
                 String expected =
                         action.mode() == CompassEditor.RENAME_AREAS

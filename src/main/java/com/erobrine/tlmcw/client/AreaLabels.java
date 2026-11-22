@@ -14,10 +14,15 @@ public final class AreaLabels {
     }
 
     public static Component full(WorkspacePlan plan, UUID area) {
-        return name(plan, area)
-                .copy()
-                .append(" · ")
-                .append(Component.translatable(plan.type(area).translationKey()));
+        var label =
+                name(plan, area)
+                        .copy()
+                        .append(" · ")
+                        .append(Component.translatable(plan.type(area).translationKey()));
+        String group = plan.node(area).workGroup();
+        if (!group.isEmpty())
+            label.append(" · ").append(Component.translatable("tlmcw.group_label", group));
+        return label;
     }
 
     private AreaLabels() {}

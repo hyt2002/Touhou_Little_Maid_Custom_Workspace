@@ -314,7 +314,7 @@ public record WorkspaceState(
     }
 
     public boolean hasNextWorkDestination() {
-        if (!plan.schedule().custom()) return plan.nodes(AreaType.WORK).size() > 1;
+        if (!plan.schedule().custom()) return plan.defaultWorkDestinations().size() > 1;
         int position = plan.schedule().position(entryId);
         return !scheduleFinished
                 && (position + 1 < plan.schedule().entries().size()
@@ -322,7 +322,7 @@ public record WorkspaceState(
     }
 
     public WorkspaceState next() {
-        var work = plan.nodes(AreaType.WORK);
+        var work = plan.defaultWorkDestinations();
         if (work.isEmpty()) return this;
         UUID next, entry = null;
         if (plan.schedule().custom()) {
@@ -335,7 +335,17 @@ public record WorkspaceState(
                                             % plan.schedule().entries().size());
             next = e.destination();
             entry = e.id();
-        } else next = work.get((work.indexOf(workDestination) + 1) % work.size());
+        } else {
+            var group = plan.node(workDestination).workGroup();
+            UUID current =
+                    group.isEmpty()
+                            ? workDestination
+                            : work.stream()
+                                    .filter(id -> plan.node(id).workGroup().equals(group))
+                                    .findFirst()
+                                    .orElse(workDestination);
+            next = work.get((work.indexOf(current) + 1) % work.size());
+        }
         var route = plan.graph().shortestPath(plan, destinationId, next);
         return new WorkspaceState(
                 plan,

@@ -63,6 +63,18 @@ public final class WorkspaceComponents {
                                             .networkSynchronized(
                                                     ByteBufCodecs.fromCodec(SelectionCorner.CODEC))
                                             .build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>>
+            WORK_GROUP_NAME =
+                    REGISTER.register(
+                            "work_group_name",
+                            () ->
+                                    DataComponentType.<String>builder()
+                                            .persistent(
+                                                    Codec.string(0, WorkspacePlan.MAX_NAME_LENGTH))
+                                            .networkSynchronized(
+                                                    ByteBufCodecs.stringUtf8(
+                                                            WorkspacePlan.MAX_NAME_LENGTH))
+                                            .build());
 
     private WorkspaceComponents() {}
 }

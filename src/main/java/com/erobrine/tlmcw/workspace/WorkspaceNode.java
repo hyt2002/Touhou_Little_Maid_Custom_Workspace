@@ -15,7 +15,8 @@ public record WorkspaceNode(
         AreaType type,
         String name,
         BlockPos min,
-        BlockPos max) {
+        BlockPos max,
+        String workGroup) {
     public static final Codec<WorkspaceNode> CODEC =
             RecordCodecBuilder.create(
                     i ->
@@ -37,7 +38,10 @@ public record WorkspaceNode(
                                                     .forGetter(WorkspaceNode::min),
                                             BlockPos.CODEC
                                                     .fieldOf("max")
-                                                    .forGetter(WorkspaceNode::max))
+                                                    .forGetter(WorkspaceNode::max),
+                                            Codec.string(0, WorkspacePlan.MAX_NAME_LENGTH)
+                                                    .optionalFieldOf("work_group", "")
+                                                    .forGetter(WorkspaceNode::workGroup))
                                     .apply(i, WorkspaceNode::new));
 
     public WorkspaceNode {
@@ -47,11 +51,22 @@ public record WorkspaceNode(
         min = min.immutable();
         max = max.immutable();
         name = WorkspacePlan.cleanName(name);
+        workGroup = type == AreaType.WORK ? WorkspacePlan.cleanName(workGroup) : "";
         if (min.getX() > max.getX()
                 || min.getY() > max.getY()
                 || min.getZ() > max.getZ()
                 || type == AreaType.WAYPOINT && !min.equals(max))
             throw new IllegalArgumentException("Invalid node bounds");
+    }
+
+    public WorkspaceNode(
+            UUID id,
+            ResourceLocation dimension,
+            AreaType type,
+            String name,
+            BlockPos min,
+            BlockPos max) {
+        this(id, dimension, type, name, min, max, "");
     }
 
     public boolean isArea() {
@@ -63,11 +78,15 @@ public record WorkspaceNode(
     }
 
     public WorkspaceNode withName(String value) {
-        return new WorkspaceNode(id, dimension, type, value, min, max);
+        return new WorkspaceNode(id, dimension, type, value, min, max, workGroup);
     }
 
     public WorkspaceNode withType(AreaType value) {
-        return new WorkspaceNode(id, dimension, value, name, min, max);
+        return new WorkspaceNode(id, dimension, value, name, min, max, workGroup);
+    }
+
+    public WorkspaceNode withWorkGroup(String value) {
+        return new WorkspaceNode(id, dimension, type, name, min, max, value);
     }
 
     public static WorkspaceNode area(ResourceLocation dim, WorkArea area) {

@@ -3,6 +3,7 @@ package com.erobrine.tlmcw.client;
 import com.erobrine.tlmcw.network.OpenCompassEditorPayload;
 import com.erobrine.tlmcw.workspace.CompassEditor;
 import com.erobrine.tlmcw.workspace.WorkspaceAccess;
+import com.erobrine.tlmcw.workspace.WorkspaceComponents;
 
 import net.minecraft.client.Minecraft;
 
@@ -14,18 +15,30 @@ public final class CompassScreens {
                 || mc.player.getInventory().selected != payload.slot()
                 || !CompassEditor.isSmartCompass(mc.player.getMainHandItem())) return;
         int mode = CompassEditor.mode(mc.player.getMainHandItem());
-        if (mode
-                != (payload.area() == null
-                        ? CompassEditor.SCHEDULE_OPTIONS
-                        : CompassEditor.RENAME_AREAS)) return;
+        boolean merge = payload.area() == null && mode == CompassEditor.MERGE_WORK_AREAS;
+        if (!merge
+                && mode
+                        != (payload.area() == null
+                                ? CompassEditor.SCHEDULE_OPTIONS
+                                : CompassEditor.RENAME_AREAS)) return;
         // This snapshot is authoritative even if normal inventory synchronization arrives a tick
         // later.
         if (!payload.plan().readable()
                 || !WorkspaceAccess.writePlan(mc.player.getMainHandItem(), payload.plan())) return;
         mc.setScreen(
-                payload.area() == null
-                        ? new WorkScheduleScreen(payload.slot(), payload.plan())
-                        : new RenameAreaScreen(payload.slot(), payload.plan(), payload.area()));
+                merge
+                        ? new RenameAreaScreen(
+                                payload.slot(),
+                                payload.plan(),
+                                null,
+                                mc.player
+                                        .getMainHandItem()
+                                        .getOrDefault(
+                                                WorkspaceComponents.WORK_GROUP_NAME.get(), ""))
+                        : payload.area() == null
+                                ? new WorkScheduleScreen(payload.slot(), payload.plan())
+                                : new RenameAreaScreen(
+                                        payload.slot(), payload.plan(), payload.area()));
     }
 
     private CompassScreens() {}

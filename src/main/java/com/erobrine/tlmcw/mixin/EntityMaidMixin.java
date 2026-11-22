@@ -42,7 +42,10 @@ public abstract class EntityMaidMixin {
         if (state != null)
             cir.setReturnValue(
                     !WorkspaceLogic.waitingForDimension((EntityMaid) (Object) this)
-                            && state.navigationArea().contains(pos));
+                            && (state.travelling()
+                                    ? state.navigationArea().contains(pos)
+                                    : WorkspaceLogic.inActiveArea(
+                                            (EntityMaid) (Object) this, state, pos)));
     }
 
     @Inject(method = "isWithinRestriction()Z", at = @At("HEAD"), cancellable = true)
@@ -52,7 +55,10 @@ public abstract class EntityMaidMixin {
         if (state != null)
             cir.setReturnValue(
                     WorkspaceLogic.waitingForDimension(maid)
-                            || state.navigationArea().contains(maid.blockPosition()));
+                            || (state.travelling()
+                                    ? state.navigationArea().contains(maid.blockPosition())
+                                    : WorkspaceLogic.inActiveArea(
+                                            maid, state, maid.blockPosition())));
     }
 
     @Inject(method = "searchDimension", at = @At("HEAD"), cancellable = true)
@@ -63,7 +69,7 @@ public abstract class EntityMaidMixin {
             cir.setReturnValue(
                     WorkspaceLogic.waitingForDimension(maid)
                             ? new AABB(maid.position(), maid.position())
-                            : state.activeArea().bounds());
+                            : WorkspaceLogic.localAreaAtFeet(maid, state).bounds());
         }
     }
 }

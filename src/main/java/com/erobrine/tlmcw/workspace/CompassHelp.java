@@ -10,7 +10,7 @@ public final class CompassHelp {
     public static MutableComponent text(String key, Object... args) {
         Object[] bindings =
                 switch (key) {
-                    case "work_menu_description", "edit_hint" ->
+                    case "work_menu_description", "edit_hint", "merge_menu_description" ->
                             keys("key.use", "key.attack", "key.sneak");
                     case "route_menu_description", "route_edit_hint" ->
                             keys("key.use", "key.attack");
@@ -21,6 +21,7 @@ public final class CompassHelp {
                             "schedule_menu_description",
                             "mark_menu_description",
                             "rename_edit_hint",
+                            "group_edit_hint",
                             "schedule_edit_hint",
                             "mark_edit_hint",
                             "aim_maid",

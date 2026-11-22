@@ -8,7 +8,7 @@ import java.util.function.Function;
 /** Every persistence/network decoder migrates raw data before decoding the current schema. */
 public final class WorkspaceDataVersions {
     public static final String FIELD = "data_version";
-    public static final int PLAN_VERSION = 2, MAID_STATE_VERSION = 2;
+    public static final int PLAN_VERSION = 3, MAID_STATE_VERSION = 3;
 
     private enum Format {
         PLAN(PLAN_VERSION),
@@ -106,6 +106,8 @@ public final class WorkspaceDataVersions {
                                                                                 .plan(updated)
                                                                         : WorkspaceLegacyMigration
                                                                                 .state(updated);
+                                                        // V2 nodes decode with no group by default.
+                                                        case 2 -> updated;
                                                         default ->
                                                                 throw new IllegalStateException(
                                                                         "Missing migration step");

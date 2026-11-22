@@ -830,7 +830,7 @@ public final class ScheduleAreaGameTests {
                                         && visited[2]
                                         && area(helper, 18).contains(restored.blockPosition()),
                                 "Restored maid skipped graph nodes or did not reach the sleep"
-                                    + " area");
+                                        + " area");
                         helper.succeed();
                     }
                 });
@@ -854,12 +854,14 @@ public final class ScheduleAreaGameTests {
                 "Return after a schedule change skipped the closest graph entry");
         helper.assertTrue(
                 maid.getBrain()
-                        .getMemory(MemoryModuleType.WALK_TARGET)
-                        .orElseThrow()
-                        .getTarget()
-                        .currentBlockPosition()
-                        .equals(area(helper, 3).navigationCenter()),
-                "Restored navigation walked directly to the destination");
+                                .getMemory(MemoryModuleType.WALK_TARGET)
+                                .orElseThrow()
+                                .getTarget()
+                                .currentBlockPosition()
+                                .equals(state.activeArea().navigationCenter())
+                        && WorkspaceController.navigationTarget(maid)
+                                .equals(area(helper, 3).navigationCenter()),
+                "Restored navigation did not keep both the entry and final destination");
         helper.assertTrue(
                 state.workTicks() == 837 && state.workDestination().equals(n(0)),
                 "Reload or schedule change lost work progress");

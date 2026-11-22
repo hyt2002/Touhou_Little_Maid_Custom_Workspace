@@ -108,6 +108,13 @@ public final class WorkspaceClient {
             return;
         }
         if (!event.isUseItem()) return;
+        if (mode == CompassEditor.MERGE_WORK_AREAS) {
+            event.setCanceled(true);
+            event.setSwingHand(false);
+            PacketDistributor.sendToServer(
+                    CompassActionPayload.simple(CompassActionPayload.MERGE_CLICK));
+            return;
+        }
         if (mode == CompassEditor.RENAME_AREAS || mode == CompassEditor.SCHEDULE_OPTIONS) {
             event.setCanceled(true);
             event.setSwingHand(false);
@@ -274,7 +281,15 @@ public final class WorkspaceClient {
         if (mc.gameRenderer.getMainCamera().getPosition().distanceToSqr(position) > 96 * 96) return;
         String name = AreaLabels.name(plan, index).getString();
         if (mc.font.width(name) > 180) name = mc.font.plainSubstrByWidth(name, 172) + "…";
-        Component type = Component.translatable(plan.type(index).translationKey());
+        String group = plan.node(index).workGroup();
+        var kind = Component.translatable(plan.type(index).translationKey());
+        if (!group.isEmpty())
+            kind.append(" · ").append(Component.translatable("tlmcw.group_label", group));
+        String kindText = kind.getString();
+        Component type =
+                mc.font.width(kindText) <= 180
+                        ? kind
+                        : Component.literal(mc.font.plainSubstrByWidth(kindText, 172) + "…");
         int color =
                 switch (plan.type(index)) {
                     case WORK -> 0xFFFF1111;
@@ -394,6 +409,11 @@ public final class WorkspaceClient {
                                                     : "key_hint_work")
                                     .withStyle(ChatFormatting.GRAY));
         var plan = WorkspaceAccess.plan(stack);
+        if (CompassEditor.mode(stack) == CompassEditor.MERGE_WORK_AREAS) {
+            String group = stack.getOrDefault(WorkspaceComponents.WORK_GROUP_NAME.get(), "");
+            if (!group.isEmpty())
+                event.getToolTip().add(Component.translatable("tlmcw.group_label", group));
+        }
         event.getToolTip()
                 .add(
                         Component.translatable(
@@ -415,6 +435,8 @@ public final class WorkspaceClient {
                                             case CompassEditor.MARK_AREAS -> "mark_edit_hint";
                                             case CompassEditor.APPLY_TO_MAID -> "apply_hint";
                                             case CompassEditor.RENAME_AREAS -> "rename_edit_hint";
+                                            case CompassEditor.MERGE_WORK_AREAS ->
+                                                    "group_edit_hint";
                                             case CompassEditor.SCHEDULE_OPTIONS ->
                                                     "schedule_edit_hint";
                                             case CompassEditor.READ_FROM_MAID -> "read_hint";

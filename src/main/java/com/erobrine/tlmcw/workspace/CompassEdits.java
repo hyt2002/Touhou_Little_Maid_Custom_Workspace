@@ -13,6 +13,17 @@ public final class CompassEdits {
             UUID area,
             String name,
             WorkSchedule schedule) {
+        return save(player, slot, expected, area, name, schedule, false);
+    }
+
+    public static boolean save(
+            Player player,
+            int slot,
+            WorkspacePlan expected,
+            UUID area,
+            String name,
+            WorkSchedule schedule,
+            boolean groupName) {
         ItemStack stack = player.getMainHandItem();
         if (player.getInventory().selected != slot
                 || !CompassEditor.isSmartCompass(stack)
@@ -22,7 +33,16 @@ public final class CompassEdits {
             return false;
         }
         WorkspacePlan updated;
-        if (area != null) {
+        if (groupName) {
+            if (area != null || CompassEditor.mode(stack) != CompassEditor.MERGE_WORK_AREAS)
+                return false;
+            String group = WorkspacePlan.cleanName(name);
+            if (group.isEmpty()) stack.remove(WorkspaceComponents.WORK_GROUP_NAME.get());
+            else stack.set(WorkspaceComponents.WORK_GROUP_NAME.get(), group);
+            CompassEditor.message(
+                    player, group.isEmpty() ? "group_name_cleared" : "group_name_set", group);
+            return true;
+        } else if (area != null) {
             if (CompassEditor.mode(stack) != CompassEditor.RENAME_AREAS
                     || expected.node(area) == null
                     || !expected.node(area).isArea()

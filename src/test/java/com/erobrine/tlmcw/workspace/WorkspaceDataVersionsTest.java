@@ -129,8 +129,10 @@ class WorkspaceDataVersionsTest {
                         .encodeStart(JsonOps.INSTANCE, s)
                         .getOrThrow()
                         .getAsJsonObject();
-        assertEquals(2, json.get("data_version").getAsInt());
-        assertEquals(2, json.getAsJsonObject("plan").get("data_version").getAsInt());
+        assertEquals(WorkspaceDataVersions.MAID_STATE_VERSION, json.get("data_version").getAsInt());
+        assertEquals(
+                WorkspaceDataVersions.PLAN_VERSION,
+                json.getAsJsonObject("plan").get("data_version").getAsInt());
         assertFalse(json.has("active_index"));
         assertTrue(json.has("runtime"));
         assertEquals(s, loadState(json));
@@ -161,7 +163,7 @@ class WorkspaceDataVersionsTest {
 
     @Test
     void futureAndMalformedPlansPreserveTheOriginalInsteadOfBecomingEmptyPlans() {
-        for (String version : List.of("3", "-1", "0.5", "true", "\"1\"", "null", "2147483648")) {
+        for (String version : List.of("4", "-1", "0.5", "true", "\"1\"", "null", "2147483648")) {
             var raw = legacyPlan(1);
             raw.add("data_version", JsonParser.parseString(version));
             var p = loadPlan(raw);

@@ -20,11 +20,15 @@ final class RenameAreaScreen extends PaperScreen {
     private String draft;
 
     RenameAreaScreen(int slot, WorkspacePlan plan, UUID area) {
-        super(tr("rename_title"));
+        this(slot, plan, area, plan.name(area));
+    }
+
+    RenameAreaScreen(int slot, WorkspacePlan plan, UUID area, String draft) {
+        super(tr(area == null ? "mode_merge" : "rename_title"));
         this.slot = slot;
         this.plan = plan;
         this.area = area;
-        draft = plan.name(area);
+        this.draft = draft;
     }
 
     @Override
@@ -32,8 +36,7 @@ final class RenameAreaScreen extends PaperScreen {
         super.init();
         name =
                 addRenderableWidget(
-                        new EditBox(
-                                font, left + 22, top + 78, panelWidth - 44, 20, tr("area_name")));
+                        new EditBox(font, left + 22, top + 78, panelWidth - 44, 20, tr(label())));
         name.setMaxLength(WorkspacePlan.MAX_NAME_LENGTH);
         name.setValue(draft);
         name.setResponder(value -> draft = value);
@@ -49,23 +52,31 @@ final class RenameAreaScreen extends PaperScreen {
                         plan,
                         area,
                         WorkspacePlan.cleanName(name.getValue()),
-                        WorkSchedule.EMPTY));
+                        WorkSchedule.EMPTY,
+                        area == null));
         onClose();
     }
 
     @Override
     protected void renderContents(GuiGraphics g, int mx, int my, float partialTick) {
-        g.drawString(
-                font,
-                font.plainSubstrByWidth(AreaLabels.full(plan, area).getString(), panelWidth - 44),
-                left + 22,
-                top + 43,
-                INK,
-                false);
-        g.drawString(font, tr("area_name"), left + 22, top + 64, MUTED, false);
-        var lines = font.split(tr("rename_note"), panelWidth - 44);
+        if (area != null)
+            g.drawString(
+                    font,
+                    font.plainSubstrByWidth(
+                            AreaLabels.full(plan, area).getString(), panelWidth - 44),
+                    left + 22,
+                    top + 43,
+                    INK,
+                    false);
+        g.drawString(font, tr(label()), left + 22, top + 64, MUTED, false);
+        var lines =
+                font.split(tr(area == null ? "group_name_note" : "rename_note"), panelWidth - 44);
         for (int i = 0; i < lines.size(); i++)
             g.drawString(font, lines.get(i), left + 22, top + 112 + 11 * i, MUTED, false);
+    }
+
+    private String label() {
+        return area == null ? "group_name" : "area_name";
     }
 
     @Override

@@ -34,6 +34,7 @@ Hold it in your main hand. Hold the tool-menu key (default **Left Alt**), scroll
 | Route nodes | Choose a starting node, then create or connect mandatory waypoints |
 | Mark areas | Click an existing cuboid to cycle work → rest → sleep |
 | Rename areas | Click a cuboid to open its name editor; its name and type appear above the box |
+| Group Work Areas | Set a group name outside a work area, then mark each member box |
 | Schedule options | Click to open the work schedule and edit destinations and delay conditions |
 | Apply to maid | Click your own maid to apply the settings |
 
@@ -62,6 +63,12 @@ After a Home state change or a successful dimension change, the maid replans fro
 
 Distances use game coordinates. Cross-dimension segments are multiplied by the configured rate for the dimension pair, defaulting to 1. Actual detours around obstacles are not simulated. See [route details](docs/ROUTE-GRAPH.md).
 
+### Grouping Work Areas
+
+Choose “Group Work Areas.” Use the compass while aiming outside a work area to enter a group name, then use it on each work area you want to assign. Areas with identical names form a group. Sneak + Use on an area to remove its group. Apply the changes to the maid.
+
+A group takes one entry in the default rotation, and tasks can search for targets in each member box. For a distant walk target, the maid can follow connected waypoints in her current dimension to the member nearest her destination, then walk to the original target. The spaces between boxes are traversable while navigating. Only the boxes count as work areas. When task navigation completes, is canceled, or stalls, the maid resumes returning to work if she is outside the group.
+
 ### Work Schedules
 
 “Schedule options” uses destination cards and separate condition editors, inspired by Create's train schedules. Click the condition type to switch between:
@@ -71,7 +78,7 @@ Distances use game coordinates. Cross-dimension segments are multiplied by the c
 
 Wireless redstone uses the train timetable's global query, with no range check and support for signals from other dimensions. Transmitters must be loaded. It checks the current signal level and does not remember pulses during travel or rest. Without Create, or if a frequency item is missing, the condition keeps waiting and its saved configuration is preserved.
 
-You can choose work areas, adjust delays, reorder, duplicate or remove entries, and run cyclically or once. With looping disabled, the maid finishes the last entry, stays in that work area and continues her original task. Without a custom schedule, work areas rotate in added order after **2400 working game ticks** each.
+You can choose work areas, adjust delays, reorder, duplicate or remove entries, and run cyclically or once. With looping disabled, the maid finishes the last entry, stays in that work area and continues her original task. By default, standalone work areas and groups rotate in added order after **2400 working game ticks** each.
 
 Travel, rest, sleep and inability to work pause progress. After confirming the editor to save the compass draft, reapply it to the maid.
 
@@ -87,7 +94,7 @@ Travel, rest, sleep and inability to work pause progress. After confirming the e
 - Maids still use TLM's original pathfinding.
 - The addon changes areas and candidate target searches. Individual tasks and their area effects are still controlled by TLM or the corresponding task mod.
 - Each area and waypoint has its own UUID and dimension. Searches do not actively load or generate chunks.
-- Compass and maid data migrate to V2 before use, converting areas, routes, schedules and runtime progress together. Unknown future versions or invalid data are preserved and disabled instead of overwritten.
+- Compass and maid data migrate to V3 before use, converting areas, routes, schedules and runtime progress together. Unknown future versions or invalid data are preserved and disabled instead of overwritten.
 
 ## Configuration
 

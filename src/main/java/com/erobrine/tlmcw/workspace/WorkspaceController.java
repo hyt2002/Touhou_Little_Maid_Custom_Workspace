@@ -48,14 +48,12 @@ public final class WorkspaceController {
         final UUID areaIndex;
         final AreaType type;
         final WorkArea area;
-        final BlockPos target;
         int ticks;
 
         Travel(WorkspaceState state) {
             this.areaIndex = state.destinationId();
             this.type = state.scheduleType();
             this.area = state.navigationArea();
-            this.target = area.navigationCenter();
         }
     }
 
@@ -89,7 +87,7 @@ public final class WorkspaceController {
         if (state.travelling()
                 && state.remainingRoute().isEmpty()
                 && !TRAVEL.containsKey(maid)
-                && !state.activeArea().contains(maid.blockPosition())) {
+                && !WorkspaceLogic.inActiveArea(maid, state, maid.blockPosition())) {
             state =
                     state.destination(
                             state.scheduleType(),
@@ -98,8 +96,9 @@ public final class WorkspaceController {
             clearWork(maid, level);
             if (waitForDimension(maid, state, level)) return;
         }
-        WorkArea area = state.activeArea();
-        if (!state.travelling() && !area.contains(maid.blockPosition())) {
+        boolean inside = WorkspaceLogic.inActiveArea(maid, state, maid.blockPosition());
+        if (!state.travelling() && !inside) {
+            if (WorkspaceNavigation.hasGroupIntent(maid, state)) return;
             state =
                     state.destination(
                             state.scheduleType(),
@@ -121,14 +120,11 @@ public final class WorkspaceController {
         }
         if (advanced) {
             WorkspaceAccess.writeState(maid, state, true);
-            clearWork(maid, level);
             TRAVEL.remove(maid);
             maid.getSchedulePos().restrictTo(maid);
         }
         if (waitForDimension(maid, state, level)) return;
-        if (!state.remainingRoute().isEmpty()
-                || !state.plan().inDimension(state.destinationId(), level.dimension().location())
-                || !area.contains(maid.blockPosition())) {
+        if (!state.remainingRoute().isEmpty() || !inside) {
             if (!state.travelling()) {
                 state = state.withTravel(true);
                 WorkspaceAccess.writeState(maid, state, true);
@@ -175,9 +171,11 @@ public final class WorkspaceController {
                 }
                 return;
             }
-            if (maid.tickCount % 20 == 0
-                    || !maid.getBrain().hasMemoryValue(MemoryModuleType.WALK_TARGET)) {
-                BehaviorUtils.setWalkAndLookTargetMemories(maid, travel.target, 0.7f, 0);
+            BlockPos destination = state.activeArea().navigationCenter();
+            var intent = maid.getBrain().getMemory(MemoryModuleType.WALK_TARGET);
+            if (intent.isEmpty()
+                    || !intent.get().getTarget().currentBlockPosition().equals(destination)) {
+                BehaviorUtils.setWalkAndLookTargetMemories(maid, destination, 0.7f, 0);
             }
             return;
         }
@@ -218,8 +216,7 @@ public final class WorkspaceController {
 
     private static boolean waitForDimension(
             EntityMaid maid, WorkspaceState state, ServerLevel level) {
-        if (state.plan().inDimension(state.navigationId(), level.dimension().location()))
-            return false;
+        if (!WorkspaceLogic.waitingForDimension(maid)) return false;
         if (!state.waitingDimension()) {
             WorkspaceAccess.writeState(maid, state.withWaitingDimension(true), true);
             clearWork(maid, level);
@@ -285,14 +282,20 @@ public final class WorkspaceController {
 
     private static RoutePlanner.Route planScheduleRoute(
             EntityMaid maid, WorkspaceState state, AreaType type, ServerLevel level) {
-        return type == AreaType.WORK
-                ? RoutePlanner.to(
-                        state.plan(),
-                        state.workDestination(),
-                        maid.position(),
-                        level.dimension().location())
-                : RoutePlanner.nearest(
-                        state.plan(), type, maid.position(), null, level.dimension().location());
+        if (type != AreaType.WORK)
+            return RoutePlanner.nearest(
+                    state.plan(), type, maid.position(), null, level.dimension().location());
+        for (var node : state.plan().areaMembers(state.workDestination())) {
+            if (node.dimension().equals(level.dimension().location())
+                    && node.bounds().contains(maid.blockPosition()))
+                return new RoutePlanner.Route(
+                        state.workDestination(), java.util.List.of(), 0, true);
+        }
+        return RoutePlanner.to(
+                state.plan(),
+                state.workDestination(),
+                maid.position(),
+                level.dimension().location());
     }
 
     public static void clear(EntityMaid maid) {
@@ -316,6 +319,7 @@ public final class WorkspaceController {
     }
 
     private static void clearWork(EntityMaid maid, ServerLevel level) {
+        WorkspaceNavigation.clear(maid);
         for (var behavior : maid.getBrain().getRunningBehaviors()) {
             if (behavior instanceof WorkspaceBehaviorGate)
                 behavior.doStop(level, maid, level.getGameTime());

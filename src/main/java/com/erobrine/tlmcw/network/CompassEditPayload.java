@@ -14,7 +14,12 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.*;
 
 public record CompassEditPayload(
-        int slot, WorkspacePlan expected, UUID area, String name, WorkSchedule schedule)
+        int slot,
+        WorkspacePlan expected,
+        UUID area,
+        String name,
+        WorkSchedule schedule,
+        boolean groupName)
         implements CustomPacketPayload {
     public static final Type<CompassEditPayload> TYPE =
             new Type<>(
@@ -32,8 +37,16 @@ public record CompassEditPayload(
                     CompassEditPayload::name,
                     ByteBufCodecs.fromCodec(WorkSchedule.CODEC),
                     CompassEditPayload::schedule,
-                    (slot, plan, area, name, schedule) ->
-                            new CompassEditPayload(slot, plan, area.orElse(null), name, schedule));
+                    ByteBufCodecs.BOOL,
+                    CompassEditPayload::groupName,
+                    (slot, plan, area, name, schedule, groupName) ->
+                            new CompassEditPayload(
+                                    slot, plan, area.orElse(null), name, schedule, groupName));
+
+    public CompassEditPayload(
+            int slot, WorkspacePlan expected, UUID area, String name, WorkSchedule schedule) {
+        this(slot, expected, area, name, schedule, false);
+    }
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -44,6 +57,12 @@ public record CompassEditPayload(
         c.enqueueWork(
                 () ->
                         CompassEdits.save(
-                                c.player(), p.slot, p.expected, p.area, p.name, p.schedule));
+                                c.player(),
+                                p.slot,
+                                p.expected,
+                                p.area,
+                                p.name,
+                                p.schedule,
+                                p.groupName));
     }
 }

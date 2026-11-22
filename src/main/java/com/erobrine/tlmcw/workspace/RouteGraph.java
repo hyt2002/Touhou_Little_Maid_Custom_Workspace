@@ -3,6 +3,7 @@ package com.erobrine.tlmcw.workspace;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.*;
+import java.util.function.Predicate;
 
 public record RouteGraph(List<RouteEdge> edges) {
     public static final int MAX_POINTS = 256, MAX_EDGES = 2048;
@@ -33,7 +34,11 @@ public record RouteGraph(List<RouteEdge> edges) {
      * transfers.
      */
     public Set<UUID> component(WorkspacePlan plan, UUID target) {
-        if (plan.node(target) == null) return Set.of();
+        return component(plan, target, id -> true);
+    }
+
+    Set<UUID> component(WorkspacePlan plan, UUID target, Predicate<UUID> allowed) {
+        if (plan.node(target) == null || !allowed.test(target)) return Set.of();
 
         var result = new HashSet<UUID>();
         var queue = new ArrayDeque<UUID>();
@@ -44,7 +49,8 @@ public record RouteGraph(List<RouteEdge> edges) {
             for (var edge : edges)
                 if (edge.touches(id)) {
                     UUID other = edge.other(id);
-                    if (plan.node(other) != null && result.add(other)) queue.add(other);
+                    if (plan.node(other) != null && allowed.test(other) && result.add(other))
+                        queue.add(other);
                 }
         }
         return Set.copyOf(result);
@@ -64,6 +70,16 @@ public record RouteGraph(List<RouteEdge> edges) {
             UUID end,
             Vec3 startPosition,
             DimensionDistances.Table table) {
+        return shortestPath(plan, start, end, startPosition, table, id -> true);
+    }
+
+    List<UUID> shortestPath(
+            WorkspacePlan plan,
+            UUID start,
+            UUID end,
+            Vec3 startPosition,
+            DimensionDistances.Table table,
+            Predicate<UUID> allowed) {
         if (plan.node(start) == null || plan.node(end) == null) return List.of();
 
         record Entry(UUID node, double distance) {}
@@ -90,7 +106,7 @@ public record RouteGraph(List<RouteEdge> edges) {
             for (var edge : edges)
                 if (edge.touches(current.node())) {
                     UUID other = edge.other(current.node());
-                    if (plan.node(other) == null) continue;
+                    if (plan.node(other) == null || !allowed.test(other)) continue;
                     Vec3 pos =
                             current.node().equals(start) && startPosition != null
                                     ? startPosition

@@ -124,6 +124,7 @@ public final class CompassToolMenu {
                         case CompassEditor.MARK_AREAS -> "mark_menu_description";
                         case CompassEditor.APPLY_TO_MAID -> "apply_menu_description";
                         case CompassEditor.RENAME_AREAS -> "rename_menu_description";
+                        case CompassEditor.MERGE_WORK_AREAS -> "merge_menu_description";
                         case CompassEditor.SCHEDULE_OPTIONS -> "schedule_menu_description";
                         case CompassEditor.READ_FROM_MAID -> "read_menu_description";
                         default -> "work_menu_description";
@@ -148,6 +149,7 @@ public final class CompassToolMenu {
                     case CompassEditor.MARK_AREAS -> "tlmcw.mode_mark";
                     case CompassEditor.APPLY_TO_MAID -> "tlmcw.mode_apply";
                     case CompassEditor.RENAME_AREAS -> "tlmcw.mode_rename";
+                    case CompassEditor.MERGE_WORK_AREAS -> "tlmcw.mode_merge";
                     case CompassEditor.SCHEDULE_OPTIONS -> "tlmcw.mode_schedule";
                     case CompassEditor.READ_FROM_MAID -> "tlmcw.mode_read";
                     default -> "tlmcw.mode_work";
@@ -184,6 +186,10 @@ public final class CompassToolMenu {
             g.fill(x + 2, y + 3, x + 8, y + 4, color);
             g.fill(x + 2, y + 6, x + 6, y + 7, color);
             g.fill(x + 9, y, x + 10, y + 12, color);
+        } else if (mode == CompassEditor.MERGE_WORK_AREAS) {
+            outline(g, x, y, 5, 5, color);
+            outline(g, x + 7, y + 7, 5, 5, color);
+            for (int i = 0; i < 4; i++) g.fill(x + 4 + i, y + 4 + i, x + 5 + i, y + 5 + i, color);
         } else if (mode == CompassEditor.SCHEDULE_OPTIONS) {
             outline(g, x, y, 12, 12, color);
             for (int i = 0; i < 3; i++) g.fill(x + 3, y + 3 + i * 3, x + 9, y + 4 + i * 3, color);

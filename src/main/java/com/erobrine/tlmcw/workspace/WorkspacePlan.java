@@ -121,6 +121,32 @@ public record WorkspacePlan(
         return nodeList.stream().filter(WorkspaceNode::isArea).map(WorkspaceNode::id).toList();
     }
 
+    public List<WorkspaceNode> areaMembers(UUID area) {
+        WorkspaceNode node = Objects.requireNonNull(node(area));
+        if (node.workGroup().isEmpty()) return List.of(node);
+        return nodeList.stream().filter(n -> n.workGroup().equals(node.workGroup())).toList();
+    }
+
+    public List<UUID> defaultWorkDestinations() {
+        Set<String> groups = new HashSet<>();
+        return nodeList.stream()
+                .filter(n -> n.type() == AreaType.WORK)
+                .filter(n -> n.workGroup().isEmpty() || groups.add(n.workGroup()))
+                .map(WorkspaceNode::id)
+                .toList();
+    }
+
+    public WorkspacePlan withWorkGroup(UUID area, String group) {
+        if (type(area) != AreaType.WORK) throw new IllegalArgumentException("Not a work area");
+        return new WorkspacePlan(
+                planId,
+                nodeList.stream()
+                        .map(n -> n.id().equals(area) ? n.withWorkGroup(group) : n)
+                        .toList(),
+                graph,
+                schedule);
+    }
+
     public List<WorkArea> areas() {
         return nodeList.stream().filter(WorkspaceNode::isArea).map(WorkspaceNode::bounds).toList();
     }

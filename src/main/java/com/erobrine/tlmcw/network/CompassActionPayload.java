@@ -25,7 +25,8 @@ public record CompassActionPayload(int action, int mode, UUID node, BlockPos min
             MARK = 4,
             OPEN_RENAME = 5,
             OPEN_SCHEDULE = 6,
-            CANCEL_ROUTE = 7;
+            CANCEL_ROUTE = 7,
+            MERGE_CLICK = 8;
     public static final Type<CompassActionPayload> TYPE =
             new Type<>(
                     ResourceLocation.fromNamespaceAndPath(
@@ -89,6 +90,11 @@ public record CompassActionPayload(int action, int mode, UUID node, BlockPos min
             return;
         }
         WorkspacePlan plan = WorkspaceAccess.plan(stack);
+        if (p.action == MERGE_CLICK) {
+            if (CompassEditor.mode(stack) == CompassEditor.MERGE_WORK_AREAS)
+                mergeClick(player, stack, plan);
+            return;
+        }
         if (plan == null) {
             CompassEditor.message(
                     player, WorkspaceAccess.blocked(stack) ? "data_unreadable" : "no_areas");
@@ -122,6 +128,35 @@ public record CompassActionPayload(int action, int mode, UUID node, BlockPos min
                 player,
                 route ? "route_deleted" : "area_deleted",
                 plan.areaIds().indexOf(p.node) + 1);
+    }
+
+    private static void mergeClick(ServerPlayer player, ItemStack stack, WorkspacePlan plan) {
+        if (WorkspaceAccess.blocked(stack)) {
+            CompassEditor.message(player, "data_unreadable");
+            return;
+        }
+        if (plan == null) {
+            plan = WorkspacePlan.empty(player.level().dimension().location());
+            WorkspaceAccess.writePlan(stack, plan);
+        }
+        UUID selected = CompassEditor.selectedNode(plan, player, false);
+        WorkspaceNode node = plan.node(selected);
+        if (node == null || node.type() != AreaType.WORK) {
+            PacketDistributor.sendToPlayer(
+                    player,
+                    new OpenCompassEditorPayload(player.getInventory().selected, null, plan));
+            return;
+        }
+        String group = stack.getOrDefault(WorkspaceComponents.WORK_GROUP_NAME.get(), "");
+        if (player.isShiftKeyDown()) {
+            WorkspaceAccess.writePlan(stack, plan.withWorkGroup(selected, ""));
+            CompassEditor.message(player, "group_removed");
+        } else if (group.isEmpty()) {
+            CompassEditor.message(player, "group_name_needed");
+        } else {
+            WorkspaceAccess.writePlan(stack, plan.withWorkGroup(selected, group));
+            CompassEditor.message(player, "group_marked", group);
+        }
     }
 
     private static boolean matches(

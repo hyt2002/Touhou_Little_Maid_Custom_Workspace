@@ -73,6 +73,60 @@ public final class RoutePlanner {
         return nearest(plan, type, feet, excluded, dim, DimensionDistances.current());
     }
 
+    static WorkspaceNode workTargetArea(
+            List<WorkspaceNode> members, BlockPos standing, BlockPos goal) {
+        for (var member : members)
+            if (member.bounds().contains(standing) && member.bounds().contains(goal)) return member;
+        Vec3 targetPosition = Vec3.atCenterOf(goal);
+        return members.stream()
+                .min(
+                        Comparator.comparingDouble(
+                                        (WorkspaceNode node) ->
+                                                node.bounds()
+                                                        .bounds()
+                                                        .distanceToSqr(targetPosition))
+                                .thenComparingDouble(
+                                        node ->
+                                                node.bounds()
+                                                        .bounds()
+                                                        .getCenter()
+                                                        .distanceToSqr(targetPosition))
+                                .thenComparing(WorkspaceNode::id))
+                .orElseThrow();
+    }
+
+    static List<UUID> toWorkArea(
+            WorkspacePlan plan, WorkspaceNode destination, Vec3 feet, ResourceLocation dimension) {
+        if (destination.bounds().contains(BlockPos.containing(feet))) return List.of();
+
+        // A vanilla WalkTarget has coordinates in the maid's present level.
+        var local = (java.util.function.Predicate<UUID>) id -> plan.inDimension(id, dimension);
+        var component = plan.graph().component(plan, destination.id(), local);
+        var entry =
+                plan.nodeList().stream()
+                        .filter(node -> component.contains(node.id()))
+                        .min(
+                                Comparator.comparingDouble(
+                                                (WorkspaceNode node) ->
+                                                        node.bounds().bounds().distanceToSqr(feet))
+                                        .thenComparingDouble(
+                                                node ->
+                                                        node.bounds()
+                                                                .bounds()
+                                                                .getCenter()
+                                                                .distanceToSqr(feet))
+                                        .thenComparing(WorkspaceNode::id))
+                        .orElseThrow();
+        return plan.graph()
+                .shortestPath(
+                        plan,
+                        entry.id(),
+                        destination.id(),
+                        null,
+                        DimensionDistances.current(),
+                        local);
+    }
+
     public static Route nearest(
             WorkspacePlan plan,
             AreaType type,
