@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.0
+
+### What's Changed
+
+- Add Group Work Areas. Areas with the same group name share target searches and count as one entry in the default rotation.
+- Let maids follow the route graph to other areas in the group and to task targets outside it. Suspend forced return while they are on the move.
+- Use the same navigation for each leg of the route while preserving the original walk target.
+- Add optional Create wireless redstone departure conditions that check powered or unpowered signals across dimensions.
+- Pick wireless redstone frequencies from the inventory without consuming items.
+- Automatically migrate saved compass and maid data, preserving areas, routes, and schedules.
+
 ## 2.0.0 beta
 
 ### What's Changed
