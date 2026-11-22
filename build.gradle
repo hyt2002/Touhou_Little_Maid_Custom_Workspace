@@ -44,6 +44,10 @@ tasks.named('jar', Jar) {
 repositories {
     mavenCentral()
     maven {
+        url = 'https://maven.createmod.net'
+        content { includeGroup 'net.createmod.ponder' }
+    }
+    maven {
         url = 'https://api.modrinth.com/maven'
         content {
             includeGroup 'maven.modrinth'
@@ -75,6 +79,10 @@ neoForge {
     runs {
         client {
             client()
+            if (project.hasProperty('wirelessUiTest')) {
+                systemProperty 'tlmcw.wirelessUiTest', 'true'
+                programArguments.addAll '--width', '1280', '--height', '720'
+            }
             if (project.hasProperty('uiSmokeTest')) {
                 systemProperty 'tlmcw.uiSmokeTest', 'true'
                 programArgument '--width'
@@ -156,6 +164,13 @@ dependencies {
     // This dependency is not embedded in the addon JAR.
     // The matching sources classifier is resolved automatically by the IDE.
     implementation "maven.modrinth:touhou-little-maid:${tlm_version}"
+
+    // Optional Create integration; the full development JAR includes its runtime dependencies.
+    compileOnly "maven.modrinth:create:${create_modrinth_version}"
+    compileOnly "net.createmod.ponder:ponder-neoforge:${create_ponder_version}"
+    if (!project.hasProperty('withoutCreate')) {
+        localRuntime "maven.modrinth:create:${create_modrinth_version}"
+    }
 
     // Development runtime mods, pinned to their NeoForge 1.21.1 Modrinth version IDs.
     // GuideME is required by AE2. These are not embedded in the addon JAR.

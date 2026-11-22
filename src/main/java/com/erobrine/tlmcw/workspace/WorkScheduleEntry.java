@@ -7,7 +7,7 @@ import net.minecraft.core.UUIDUtil;
 
 import java.util.UUID;
 
-public record WorkScheduleEntry(UUID id, UUID destination, DelayCondition condition) {
+public record WorkScheduleEntry(UUID id, UUID destination, DepartureCondition condition) {
     public static final Codec<WorkScheduleEntry> CODEC =
             RecordCodecBuilder.create(
                     i ->
@@ -18,7 +18,7 @@ public record WorkScheduleEntry(UUID id, UUID destination, DelayCondition condit
                                             UUIDUtil.CODEC
                                                     .fieldOf("destination")
                                                     .forGetter(WorkScheduleEntry::destination),
-                                            DelayCondition.CODEC
+                                            DepartureCondition.CODEC
                                                     .fieldOf("condition")
                                                     .forGetter(WorkScheduleEntry::condition))
                                     .apply(i, WorkScheduleEntry::new));
@@ -29,7 +29,7 @@ public record WorkScheduleEntry(UUID id, UUID destination, DelayCondition condit
         java.util.Objects.requireNonNull(condition);
     }
 
-    public WorkScheduleEntry(UUID destination, DelayCondition condition) {
+    public WorkScheduleEntry(UUID destination, DepartureCondition condition) {
         this(UUID.randomUUID(), destination, condition);
     }
 
@@ -37,7 +37,7 @@ public record WorkScheduleEntry(UUID id, UUID destination, DelayCondition condit
         return new WorkScheduleEntry(id, value, condition);
     }
 
-    public WorkScheduleEntry withCondition(DelayCondition value) {
+    public WorkScheduleEntry withCondition(DepartureCondition value) {
         return new WorkScheduleEntry(id, destination, value);
     }
 

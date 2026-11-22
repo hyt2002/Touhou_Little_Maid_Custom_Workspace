@@ -38,7 +38,7 @@ public final class TouhouLittleMaidCustomWorkspace {
     }
 
     private void registerPayloads(RegisterPayloadHandlersEvent event) {
-        event.registrar("7")
+        event.registrar("8")
                 .playToServer(
                         CompassActionPayload.TYPE,
                         CompassActionPayload.STREAM_CODEC,

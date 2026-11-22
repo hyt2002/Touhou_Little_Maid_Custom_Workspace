@@ -192,7 +192,16 @@ public final class WorkspaceController {
         }
         if (state.scheduleType() != AreaType.WORK || !maid.getBrain().isActive(Activity.WORK))
             return;
-        WorkspaceState counted = state.countWork(Config.WORK_TICKS.get());
+        WorkspaceState counted;
+        if (state.plan().schedule().custom()
+                && state.plan().schedule().entry(state.entryId()).condition()
+                        instanceof WirelessRedstoneCondition wireless) {
+            counted =
+                    com.erobrine.tlmcw.compat.CreateRedstoneCompat.matches(wireless)
+                            ? state.completeCondition()
+                            : state;
+        } else counted = state.countWork(Config.WORK_TICKS.get());
+        if (counted == state) return;
         if (counted.travelling())
             rotate(
                     maid,

@@ -43,6 +43,9 @@ jobs:
       - name: Run server integration tests
         run: ./gradlew runGameTestServer --console=plain
 
+      - name: Run integration tests without optional Create
+        run: ./gradlew runGameTestServer -PwithoutCreate --console=plain
+
       - name: Upload mod artifact
         uses: actions/upload-artifact@v4
         with:

@@ -64,7 +64,12 @@ Distances use game coordinates. Cross-dimension segments are multiplied by the c
 
 ### Work Schedules
 
-“Schedule options” uses destination cards and separate condition editors, inspired by Create's train schedules. The current condition is **delay x game ticks**: after arriving at the specified work area, the maid starts counting working ticks, then proceeds to the next destination when the condition is met.
+“Schedule options” uses destination cards and separate condition editors, inspired by Create's train schedules. Click the condition type to switch between:
+
+- **Delay x game ticks**: count working ticks after arrival, then proceed to the next destination.
+- **Wireless redstone (optional Create 6.0.x integration)**: choose two frequency marks and a powered/unpowered state, then proceed when that state matches. Select “Mark Frequencies” to open the inventory, select a frequency slot, then click an inventory item to copy its mark without consuming the item. Frequencies match by item type and dyed color, following Create.
+
+Wireless redstone uses the train timetable's global query, with no range check and support for signals from other dimensions. Transmitters must be loaded. It checks the current signal level and does not remember pulses during travel or rest. Without Create, or if a frequency item is missing, the condition keeps waiting and its saved configuration is preserved.
 
 You can choose work areas, adjust delays, reorder, duplicate or remove entries, and run cyclically or once. With looping disabled, the maid finishes the last entry, stays in that work area and continues her original task. Without a custom schedule, work areas rotate in added order after **2400 working game ticks** each.
 

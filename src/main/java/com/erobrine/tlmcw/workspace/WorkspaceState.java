@@ -353,7 +353,11 @@ public record WorkspaceState(
     public WorkspaceState countWork(long interval) {
         if (travelling || suspended || scheduleType != AreaType.WORK || scheduleFinished)
             return this;
-        if (plan.schedule().custom()) interval = plan.schedule().entry(entryId).condition().ticks();
+        if (plan.schedule().custom()) {
+            if (!(plan.schedule().entry(entryId).condition() instanceof DelayCondition delay))
+                return this;
+            interval = delay.ticks();
+        }
         long elapsed = workTicks == Long.MAX_VALUE ? Long.MAX_VALUE : workTicks + 1;
         boolean finished = false;
         if (elapsed >= interval) {
@@ -370,6 +374,24 @@ public record WorkspaceState(
                 workDestination,
                 entryId,
                 finished,
+                false);
+    }
+
+    public WorkspaceState completeCondition() {
+        if (travelling || suspended || scheduleType != AreaType.WORK || scheduleFinished)
+            return this;
+        if (hasNextWorkDestination()) return next();
+        if (!plan.schedule().custom() || plan.schedule().cyclic()) return this;
+        return new WorkspaceState(
+                plan,
+                destinationId,
+                workTicks,
+                false,
+                List.of(),
+                scheduleType,
+                workDestination,
+                entryId,
+                true,
                 false);
     }
 }

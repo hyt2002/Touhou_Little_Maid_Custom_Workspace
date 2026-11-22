@@ -248,7 +248,9 @@ public final class V2Fixtures {
             entry.put(
                     "condition",
                     DelayCondition.CODEC
-                            .encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, e.condition())
+                            .encodeStart(
+                                    net.minecraft.nbt.NbtOps.INSTANCE,
+                                    (DelayCondition) e.condition())
                             .getOrThrow());
             entries.add(entry);
         }

@@ -25,7 +25,7 @@ import java.util.List;
 /** Opt-in screenshots and real widget interactions. Excluded from the release JAR. */
 public final class ClientUiSmokeTest {
     private static int phase = -1, frames;
-    private static boolean loading;
+    private static boolean loading, finished;
     private static Screen parent;
     private static WorkspacePlan plan;
     private static int originalScale;
@@ -62,6 +62,7 @@ public final class ClientUiSmokeTest {
     }
 
     private static void rendered(ScreenEvent.Render.Post event) {
+        if (finished) return;
         Minecraft mc = Minecraft.getInstance();
         try {
             if (phase == -1) {
@@ -153,11 +154,11 @@ public final class ClientUiSmokeTest {
                                                                         new Class[] {
                                                                             int.class,
                                                                             WorkspacePlan.class,
-                                                                            int.class
+                                                                            java.util.UUID.class
                                                                         },
                                                                         0,
                                                                         plan,
-                                                                        2));
+                                                                        n(2)));
                                                         phase = 0;
                                                     } catch (Exception exception) {
                                                         throw new IllegalStateException(exception);
@@ -212,7 +213,8 @@ public final class ClientUiSmokeTest {
                     duration.setValue("600");
                     event.getScreen().keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0);
                     var entry = (WorkScheduleEntry) ((List<?>) field(parent, "entries")).getFirst();
-                    if (entry.condition().ticks() != 600)
+                    if (!(entry.condition() instanceof DelayCondition delay)
+                            || delay.ticks() != 600)
                         throw new AssertionError("Condition GUI failed to update the entry");
                     parent.mouseClicked(left + 65, top + 49 + 10, 0);
                 }
@@ -229,6 +231,7 @@ public final class ClientUiSmokeTest {
                     parent.mouseScrolled(left + 60, top + 90, 0, -7);
                 }
                 case 5 -> {
+                    finished = true;
                     System.out.println("TLMCW_UI_SMOKE_PASSED");
                     restore(mc);
                     mc.stop();
@@ -236,6 +239,7 @@ public final class ClientUiSmokeTest {
                 default -> throw new AssertionError("Unexpected UI test phase");
             }
         } catch (Throwable failure) {
+            finished = true;
             failure.printStackTrace();
             System.out.println("TLMCW_UI_SMOKE_FAILED");
             restore(mc);

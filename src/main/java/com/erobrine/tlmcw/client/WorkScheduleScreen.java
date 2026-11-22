@@ -137,7 +137,7 @@ final class WorkScheduleScreen extends PaperScreen {
         custom = true;
     }
 
-    void changeCondition(int index, DelayCondition condition) {
+    void changeCondition(int index, DepartureCondition condition) {
         entries.set(index, entries.get(index).withCondition(condition));
         custom = true;
     }
@@ -179,13 +179,24 @@ final class WorkScheduleScreen extends PaperScreen {
                             && my >= viewportTop()
                             && my < viewportBottom();
             frame(g, x + 30, y + 31, cardWidth - 55, 22, conditionHover ? 0xFFF4EACF : 0xFFE0CFAC);
-            g.drawString(
-                    font,
-                    tr("delay_summary", entry.condition().ticks()),
-                    x + 38,
-                    y + 38,
-                    INK,
-                    false);
+            if (entry.condition() instanceof DelayCondition delay) {
+                g.drawString(font, tr("delay_summary", delay.ticks()), x + 38, y + 38, INK, false);
+            } else if (entry.condition() instanceof WirelessRedstoneCondition wireless) {
+                g.drawString(
+                        font,
+                        font.plainSubstrByWidth(
+                                tr(wireless.powered()
+                                                ? "wireless_summary_on"
+                                                : "wireless_summary_off")
+                                        .getString(),
+                                cardWidth - 110),
+                        x + 38,
+                        y + 38,
+                        INK,
+                        false);
+                g.renderItem(wireless.first().stack(), x + cardWidth - 63, y + 34);
+                g.renderItem(wireless.second().stack(), x + cardWidth - 45, y + 34);
+            }
             g.drawString(font, "↓", x + 13, y + 38, 0xFF866633, false);
             if (i > 0) g.drawString(font, "▲", x + cardWidth + 5, y + 16, INK, false);
             if (i + 1 < entries.size())
@@ -245,7 +256,7 @@ final class WorkScheduleScreen extends PaperScreen {
                         }
                     } else if (my >= y + 27)
                         minecraft.setScreen(
-                                new DelayConditionScreen(
+                                new DepartureConditionScreen(
                                         this, index, entries.get(index).condition()));
                     else
                         minecraft.setScreen(
